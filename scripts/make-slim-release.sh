@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build a slim FastFlow.app + zip for smooth downloads.
-# Models are NEVER bundled — users download ASR weights after install (~500–600 MB once).
+# Build a slim FastFlow.app inside a classic Mac installer .dmg
+# (drag FastFlow → Applications). Models are NEVER bundled.
 #
-# Target: app zip well under ~30 MB (typically a few MB of executable + resources).
+# Target: DMG well under ~30 MB for a one-click Safari download from GitHub Releases.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -10,14 +10,15 @@ cd "$ROOT"
 CONFIG="${1:-release}"
 DIST="$ROOT/dist"
 APP="$DIST/FastFlow.app"
-ZIP="$DIST/FastFlow-slim-macos-arm64.zip"
+STAGE="$DIST/dmg-root"
+DMG="$DIST/FastFlow.dmg"
+DMG_RW="$DIST/FastFlow.rw.dmg"
 
-echo "==> Slim release (config=$CONFIG) — no CoreML models in package"
+echo "==> Slim Mac installer DMG (config=$CONFIG) — no CoreML models"
 
 rm -rf "$DIST"
-mkdir -p "$DIST"
+mkdir -p "$DIST" "$STAGE"
 
-# Prefer full Xcode when present (CLT-only SPM often fails on macOS 26).
 if [[ -d /Applications/Xcode.app ]]; then
   export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 fi
@@ -27,23 +28,20 @@ BIN="$ROOT/.build/$CONFIG/FastFlow"
 test -x "$BIN"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-# Strip local symbols to shrink download size.
+cp "$BIN" "$APP/Contents/MacOS/FastFlow"
 if command -v strip >/dev/null; then
-  cp "$BIN" "$APP/Contents/MacOS/FastFlow"
   strip -x "$APP/Contents/MacOS/FastFlow" || true
-else
-  cp "$BIN" "$APP/Contents/MacOS/FastFlow"
 fi
 
-# Tiny marker: proves this is a slim package (no models).
 cat > "$APP/Contents/Resources/SLIM_PACKAGE.txt" <<'EOF'
 FastFlow slim package
-- No ASR / CoreML models are included.
+- No ASR / CoreML models are included in this DMG.
 - First launch uses a tiny stub engine (low RAM).
-- Use menu → "Download Speech Model…" for Parakeet (~500–600 MB, one-time).
-- Models cache under Application Support (FluidAudio), not inside this .app.
+- Menu → "Download Speech Model…" for Parakeet (~500–600 MB, one-time).
+- Models cache under Application Support — not inside this .app.
 EOF
 
+# Simple document icon placeholder isn't required; system will use generic app icon.
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -60,9 +58,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>0.1.1</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>2</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -75,25 +73,51 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Debug entitlements for MVP downloads; ship sandbox is separate.
+# Ad-hoc sign for local/CI MVP (notarization comes later for Gatekeeper-friendly opens).
 ENT="$ROOT/entitlements/FastFlow.debug.entitlements"
 if [[ -f "$ENT" ]]; then
   codesign --force --deep --sign - --entitlements "$ENT" "$APP" 2>/dev/null || \
     codesign --force --sign - "$APP" 2>/dev/null || true
 fi
 
-# Exclude any accidental model caches from the zip.
-(
-  cd "$DIST"
-  ditto -c -k --sequesterRsrc --keepParent FastFlow.app "$(basename "$ZIP")"
-)
+# Classic installer layout: app + Applications alias.
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+ditto "$APP" "$STAGE/FastFlow.app"
+ln -s /Applications "$STAGE/Applications"
 
-BYTES=$(wc -c < "$ZIP" | tr -d ' ')
-MB=$(echo "scale=2; $BYTES/1024/1024" | bc)
+# Optional HOW_TO_INSTALL text users see in the Finder window.
+cat > "$STAGE/How to Install.txt" <<'EOF'
+Install FastFlow
+
+1. Drag FastFlow into the Applications folder.
+2. Open Applications → FastFlow (right-click → Open the first time if macOS asks).
+3. Grant Microphone and Accessibility when prompted.
+4. Hold Right Option to dictate.
+5. Optional: menu bar → Download Speech Model… (one-time, ~500–600 MB).
+
+Speech models are not in this DMG — that keeps the download small.
+EOF
+
+# Create compressed read-only DMG (Safari / GitHub Releases friendly).
+rm -f "$DMG" "$DMG_RW"
+hdiutil create \
+  -volname "FastFlow" \
+  -srcfolder "$STAGE" \
+  -ov \
+  -format UDZO \
+  -imagekey zlib-level=9 \
+  "$DMG"
+
+# Ad-hoc sign the DMG itself (helps a little; full notarization is still required for zero Gatekeeper friction).
+codesign --force --sign - "$DMG" 2>/dev/null || true
+
+BYTES=$(wc -c < "$DMG" | tr -d ' ')
+MB=$(python3 -c "print(round($BYTES/1024/1024, 2))")
 echo ""
-echo "Slim artifact: $ZIP ($MB MB)"
-echo "Models are NOT included. Users download after install via the menu."
-if awk "BEGIN { exit !($MB > 40) }"; then
-  echo "WARNING: slim zip is larger than 40 MB — check for bundled models or unstripped deps."
+echo "Mac installer: $DMG ($MB MB)"
+echo "Install vibe: open DMG → drag FastFlow → Applications"
+echo "One-click URL (after release): https://github.com/SJ2006-stack/FastFlow/releases/latest/download/FastFlow.dmg"
+if python3 -c "import sys; sys.exit(0 if $BYTES > 40*1024*1024 else 1)"; then
+  echo "WARNING: DMG is larger than 40 MB — check for bundled models."
 fi
-echo "Install: unzip and open FastFlow.app (right-click → Open if Gatekeeper blocks)."
