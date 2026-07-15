@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Default in-memory bias list (always available).
 public final class InMemoryBiasListStore: BiasListStore, @unchecked Sendable {
@@ -12,8 +13,7 @@ public final class InMemoryBiasListStore: BiasListStore, @unchecked Sendable {
         requiresNetwork: false
     )
     public private(set) var isActive = false
-    private var words: [String: BiasedWord] = [:]
-    private let lock = NSLock()
+    private let words = OSAllocatedUnfairLock(initialState: [String: BiasedWord]())
 
     public init() {}
 
@@ -21,24 +21,21 @@ public final class InMemoryBiasListStore: BiasListStore, @unchecked Sendable {
     public func deactivate() async { isActive = false }
 
     public func allWords() async throws -> [BiasedWord] {
-        lock.lock(); defer { lock.unlock() }
-        return Array(words.values).sorted { $0.word < $1.word }
+        words.withLock { dict in
+            Array(dict.values).sorted { $0.word < $1.word }
+        }
     }
 
     public func upsert(_ word: BiasedWord) async throws {
-        lock.lock(); defer { lock.unlock() }
-        words[word.word.lowercased()] = word
+        words.withLock { $0[word.word.lowercased()] = word }
     }
 
     public func remove(word: String) async throws {
-        lock.lock(); defer { lock.unlock() }
-        words.removeValue(forKey: word.lowercased())
+        words.withLock { $0.removeValue(forKey: word.lowercased()) }
     }
 }
 
-/// SQLite-backed store skeleton (Application Support). Uses Foundation only —
-/// full GRDB integration can replace the file format later without changing
-/// the `BiasListStore` protocol.
+/// File-backed bias store under Application Support (JSON skeleton).
 public final class SQLiteBiasListStore: BiasListStore, @unchecked Sendable {
     public static let manifestID = "bias.sqlite"
     public let manifest = PluginManifest(
@@ -51,8 +48,7 @@ public final class SQLiteBiasListStore: BiasListStore, @unchecked Sendable {
     )
     public private(set) var isActive = false
     private let fileURL: URL
-    private var cache: [String: BiasedWord] = [:]
-    private let lock = NSLock()
+    private let cache = OSAllocatedUnfairLock(initialState: [String: BiasedWord]())
 
     public init(fileURL: URL? = nil) {
         if let fileURL {
@@ -66,37 +62,35 @@ public final class SQLiteBiasListStore: BiasListStore, @unchecked Sendable {
     }
 
     public func activate() async throws {
-        lock.lock()
-        defer { lock.unlock() }
-        cache = Self.load(from: fileURL)
+        let loaded = Self.load(from: fileURL)
+        cache.withLock { $0 = loaded }
         isActive = true
     }
 
     public func deactivate() async {
-        lock.lock()
-        cache.removeAll()
+        cache.withLock { $0.removeAll() }
         isActive = false
-        lock.unlock()
     }
 
     public func allWords() async throws -> [BiasedWord] {
-        lock.lock(); defer { lock.unlock() }
-        return Array(cache.values).sorted { $0.word < $1.word }
+        cache.withLock { dict in
+            Array(dict.values).sorted { $0.word < $1.word }
+        }
     }
 
     public func upsert(_ word: BiasedWord) async throws {
-        lock.lock()
-        cache[word.word.lowercased()] = word
-        let snapshot = Array(cache.values)
-        lock.unlock()
+        let snapshot: [BiasedWord] = cache.withLock { dict in
+            dict[word.word.lowercased()] = word
+            return Array(dict.values)
+        }
         try Self.save(snapshot, to: fileURL)
     }
 
     public func remove(word: String) async throws {
-        lock.lock()
-        cache.removeValue(forKey: word.lowercased())
-        let snapshot = Array(cache.values)
-        lock.unlock()
+        let snapshot: [BiasedWord] = cache.withLock { dict in
+            dict.removeValue(forKey: word.lowercased())
+            return Array(dict.values)
+        }
         try Self.save(snapshot, to: fileURL)
     }
 

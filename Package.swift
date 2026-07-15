@@ -29,6 +29,8 @@ let package = Package(
             path: "Sources/FastFlowPlugins",
             swiftSettings: [
                 .define("FASTFLOW_USE_FLUIDAUDIO"),
+                // CI builds with Swift 6; keep approachable concurrency for MVP packaging.
+                .swiftLanguageMode(.v5),
             ]
         ),
         .executableTarget(
@@ -37,6 +39,7 @@ let package = Package(
             path: "Sources/FastFlow",
             swiftSettings: [
                 .define("FASTFLOW_USE_FLUIDAUDIO"),
+                .swiftLanguageMode(.v5),
             ]
         ),
         .executableTarget(
@@ -45,12 +48,16 @@ let package = Package(
             path: "Sources/FastFlowBench",
             swiftSettings: [
                 .define("FASTFLOW_USE_FLUIDAUDIO"),
+                .swiftLanguageMode(.v5),
             ]
         ),
         .testTarget(
             name: "FastFlowTests",
             dependencies: ["FastFlowPlugins"],
-            path: "Tests/FastFlowTests"
+            path: "Tests/FastFlowTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
         ),
     ]
 )

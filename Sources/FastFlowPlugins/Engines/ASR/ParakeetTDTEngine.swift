@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 #if FASTFLOW_USE_FLUIDAUDIO
 import FluidAudio
@@ -21,10 +22,17 @@ public final class ParakeetTDTEngine: ASREngine, @unchecked Sendable {
         supportsStreaming: false
     )
 
-    public private(set) var isActive = false
-    private var manager: AsrManager?
-    private var bias: [BiasedWord] = []
-    private let lock = NSLock()
+    private struct State {
+        var isActive = false
+        var manager: AsrManager?
+        var bias: [BiasedWord] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    public var isActive: Bool {
+        state.withLock(\.isActive)
+    }
 
     public init() {}
 
@@ -35,44 +43,40 @@ public final class ParakeetTDTEngine: ASREngine, @unchecked Sendable {
     }
 
     public func activate() async throws {
-        if isActive, manager != nil { return }
+        if state.withLock({ $0.isActive && $0.manager != nil }) { return }
 
         let cached = Self.modelsCachedOnDisk()
         let enforcer = PluginCapabilityEnforcer()
-        // Offline load OK in main; first-run download needs host or debug escape.
         try enforcer.assertCanActivate(manifest, modelsCached: cached)
 
         let models: AsrModels
         if cached {
             models = try await AsrModels.loadFromCache(version: .v3)
         } else {
-            // Requires NetworkPluginHost role or FASTFLOW_ALLOW_INPROCESS_NETWORK=1.
             models = try await AsrModels.downloadAndLoad(version: .v3)
         }
         let asr = AsrManager(config: .default, models: models)
 
-        lock.lock()
-        manager = asr
-        isActive = true
-        lock.unlock()
+        state.withLock {
+            $0.manager = asr
+            $0.isActive = true
+        }
     }
 
     public func deactivate() async {
-        lock.lock()
-        let asr = manager
-        manager = nil
-        isActive = false
-        lock.unlock()
+        let asr = state.withLock { s -> AsrManager? in
+            let m = s.manager
+            s.manager = nil
+            s.isActive = false
+            return m
+        }
         if let asr {
             await asr.cleanup()
         }
     }
 
     public func transcribe(_ samples: [Float]) async throws -> String {
-        lock.lock()
-        let asr = manager
-        lock.unlock()
-
+        let asr = state.withLock(\.manager)
         guard let asr else {
             throw ASREngineError.notLoaded(name: name)
         }
@@ -80,13 +84,13 @@ public final class ParakeetTDTEngine: ASREngine, @unchecked Sendable {
             throw ASREngineError.emptyAudio
         }
 
-        var state = try TdtDecoderState()
-        let result = try await asr.transcribe(samples, decoderState: &state, language: nil)
+        var decoderState = try TdtDecoderState()
+        let result = try await asr.transcribe(samples, decoderState: &decoderState, language: nil)
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public func applyBiasList(_ words: [BiasedWord]) async {
-        bias = words
+        state.withLock { $0.bias = words }
     }
 }
 
