@@ -25,6 +25,12 @@ final class StatusItemController: NSObject {
     var onConfigureAPIKeys: (() -> Void)?
     var onChangeModel: (() -> Void)?
     var onAddBYO: (() -> Void)?
+    var onChangeHotkey: (() -> Void)?
+    var onShowBlob: (() -> Void)?
+    var onMoveBlob: (() -> Void)?
+    var onRerunSetup: (() -> Void)?
+
+    private var hotkeyLabel: String = HotkeyPreferences.currentPreset.name
 
     private(set) var state: MenuBarIconState = .idle {
         didSet { render() }
@@ -47,6 +53,10 @@ final class StatusItemController: NSObject {
         self.state = state
     }
 
+    func setHotkeyLabel(_ label: String) {
+        hotkeyLabel = label
+    }
+
     func rebuildMenu(
         engineName: String = "—",
         pluginCount: Int = 0,
@@ -58,7 +68,7 @@ final class StatusItemController: NSObject {
         menu.removeAllItems()
         menu.addItem(withTitle: "FastFlow", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
-        menu.addItem(withTitle: "Dictate: hold Right Option", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Dictate: hold \(hotkeyLabel)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Engine: \(engineName)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
@@ -69,7 +79,11 @@ final class StatusItemController: NSObject {
         menu.items.last?.isEnabled = false
         menu.addItem(.separator())
 
-        // Local free / enhanced
+        menu.addItem(withTitle: "Change Hotkey…", action: #selector(changeHotkey), keyEquivalent: "h")
+        menu.addItem(withTitle: "Show Corner Blob", action: #selector(showBlob), keyEquivalent: "")
+        menu.addItem(withTitle: "Move Blob Corner…", action: #selector(moveBlob), keyEquivalent: "")
+        menu.addItem(.separator())
+
         let localHeader = NSMenuItem(title: "FREE — local (default)", action: nil, keyEquivalent: "")
         localHeader.isEnabled = false
         menu.addItem(localHeader)
@@ -135,6 +149,7 @@ final class StatusItemController: NSObject {
         menu.addItem(perms)
         menu.addItem(withTitle: "Request Microphone…", action: #selector(reqMic), keyEquivalent: "")
         menu.addItem(withTitle: "Request Accessibility…", action: #selector(reqAX), keyEquivalent: "")
+        menu.addItem(withTitle: "Run Setup Wizard Again…", action: #selector(rerunSetup), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit FastFlow", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items where item.action != nil {
@@ -185,6 +200,10 @@ final class StatusItemController: NSObject {
     @objc private func configureKeys() { onConfigureAPIKeys?() }
     @objc private func changeModel() { onChangeModel?() }
     @objc private func addBYO() { onAddBYO?() }
+    @objc private func changeHotkey() { onChangeHotkey?() }
+    @objc private func showBlob() { onShowBlob?() }
+    @objc private func moveBlob() { onMoveBlob?() }
+    @objc private func rerunSetup() { onRerunSetup?() }
     @objc private func selectEngine(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         onSelectEngine?(id)

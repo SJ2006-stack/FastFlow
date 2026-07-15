@@ -3,35 +3,82 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 
-/// Global push-to-talk hotkey via CGEventTap (default: Right Option).
+/// Global push-to-talk via CGEventTap.
+/// Default preset: **Spacebar** (hold to talk). Events are swallowed so Space isn’t typed while dictating.
 final class HotkeyMonitor: @unchecked Sendable {
-    struct Choice: Equatable {
+    struct Preset: Equatable, Sendable {
+        let id: String
         let name: String
         let keycode: CGKeyCode
         let isModifier: Bool
         let modifierFlag: CGEventFlags?
-    }
+        /// When true, the tap consumes the key so it doesn’t reach the focused app.
+        let swallowEvents: Bool
 
-    static let rightOption = Choice(
-        name: "Right Option",
-        keycode: 61,
-        isModifier: true,
-        modifierFlag: .maskAlternate
-    )
+        static let space = Preset(
+            id: "space",
+            name: "Spacebar (hold)",
+            keycode: 49,
+            isModifier: false,
+            modifierFlag: nil,
+            swallowEvents: true
+        )
+
+        static let rightOption = Preset(
+            id: "rightOption",
+            name: "Right Option (hold)",
+            keycode: 61,
+            isModifier: true,
+            modifierFlag: .maskAlternate,
+            swallowEvents: false
+        )
+
+        static let leftOption = Preset(
+            id: "leftOption",
+            name: "Left Option (hold)",
+            keycode: 58,
+            isModifier: true,
+            modifierFlag: .maskAlternate,
+            swallowEvents: false
+        )
+
+        static let rightCommand = Preset(
+            id: "rightCommand",
+            name: "Right ⌘ (hold)",
+            keycode: 54,
+            isModifier: true,
+            modifierFlag: .maskCommand,
+            swallowEvents: false
+        )
+
+        static let f5 = Preset(
+            id: "f5",
+            name: "F5 (hold)",
+            keycode: 96,
+            isModifier: false,
+            modifierFlag: nil,
+            swallowEvents: true
+        )
+
+        static let all: [Preset] = [.space, .rightOption, .leftOption, .rightCommand, .f5]
+    }
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private let choice: Choice
+    private var choice: Preset
     private var isDown = false
 
     var onDown: (() -> Void)?
     var onUp: (() -> Void)?
 
-    init(choice: Choice = HotkeyMonitor.rightOption) {
+    var currentPreset: Preset { choice }
+
+    init(choice: Preset = HotkeyPreferences.currentPreset) {
         self.choice = choice
     }
 
     func start() throws {
+        stop()
         guard AXIsProcessTrusted() else {
             throw HotkeyError.accessibilityRequired
         }
@@ -40,17 +87,23 @@ final class HotkeyMonitor: @unchecked Sendable {
             | (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
 
+        // Swallow Space / F5 so they don’t type into the focused field while PTT is held.
+        let options: CGEventTapOptions = choice.swallowEvents ? .defaultTap : .listenOnly
+
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
-            monitor.handle(type: type, event: event)
+            let consume = monitor.handle(type: type, event: event)
+            if consume {
+                return nil
+            }
             return Unmanaged.passUnretained(event)
         }
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: options,
             eventsOfInterest: CGEventMask(mask),
             callback: callback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -73,9 +126,18 @@ final class HotkeyMonitor: @unchecked Sendable {
         }
         tap = nil
         runLoopSource = nil
+        isDown = false
     }
 
-    private func handle(type: CGEventType, event: CGEvent) {
+    func applyPreset(_ preset: Preset) throws {
+        choice = preset
+        HotkeyPreferences.presetID = preset.id
+        try start()
+    }
+
+    /// Returns true if the event should be swallowed.
+    @discardableResult
+    private func handle(type: CGEventType, event: CGEvent) -> Bool {
         let keycode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
 
         if choice.isModifier, type == .flagsChanged, keycode == choice.keycode {
@@ -88,19 +150,27 @@ final class HotkeyMonitor: @unchecked Sendable {
                 isDown = false
                 DispatchQueue.main.async { self.onUp?() }
             }
-            return
+            return choice.swallowEvents
         }
 
-        guard !choice.isModifier, keycode == choice.keycode else { return }
-        if type == .keyDown, !event.flags.contains(.maskSecondaryFn) {
+        guard !choice.isModifier, keycode == choice.keycode else { return false }
+
+        // Ignore key-repeat while already down.
+        if type == .keyDown {
+            let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            if isRepeat { return choice.swallowEvents }
             if !isDown {
                 isDown = true
                 DispatchQueue.main.async { self.onDown?() }
             }
-        } else if type == .keyUp, isDown {
+            return choice.swallowEvents
+        }
+        if type == .keyUp, isDown {
             isDown = false
             DispatchQueue.main.async { self.onUp?() }
+            return choice.swallowEvents
         }
+        return false
     }
 }
 

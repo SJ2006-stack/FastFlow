@@ -18,31 +18,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var status: StatusItemController!
     private var hotkey: HotkeyMonitor!
     private var session: DictationSession!
+    private var blob: CornerBlobHUD!
     private var preference: ASRBackendPreference = AppConfig.preferredBackend
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         PluginBootstrap.registerBuiltins()
 
-        // Authentic Mac first-run: pick FREE local vs BYO before dictation.
+        // 1) Model choice
         if !ModelSelectionStore.hasCompletedModelOnboarding {
             NSApp.activate(ignoringOtherApps: true)
             applyModelChoice(FirstRunModelPicker.runModal(isFirstLaunch: true), markOnboardingComplete: true)
         }
 
+        // 2) Permissions → custom hotkey (default Spacebar) → blob corner
+        let setup = SetupWizard.runIfNeeded()
+
         let engine = AppConfig.makeASREngine(preference: preference)
         session = DictationSession(engine: engine)
         status = StatusItemController()
+        status.setHotkeyLabel(setup.hotkey.name)
+        blob = CornerBlobHUD(corner: setup.corner)
+        blob.show()
         wireUI()
         refreshMenu()
 
         session.onStateChange = { [weak self] state in
             self?.status.setState(state)
+            self?.blob.setState(state)
         }
         session.onEngineChange = { [weak self] _ in
             self?.refreshMenu()
         }
 
-        hotkey = HotkeyMonitor()
+        hotkey = HotkeyMonitor(choice: setup.hotkey)
         hotkey.onDown = { [weak self] in self?.session.beginListening() }
         hotkey.onUp = { [weak self] in self?.session.endListening() }
 
@@ -52,23 +60,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("FastFlow hotkey: \(error.localizedDescription)")
             PermissionGate.promptAccessibility()
             status.setState(.error)
+            blob.setState(.error)
         }
 
         Task { await session.warmUp() }
 
-        // If user picked FREE Parakeet and weights aren't cached yet, download once.
         if preference == .parakeet || ModelSelectionStore.selectedASRID == ParakeetTDTEngine.manifestID,
            !AppConfig.parakeetModelsCached {
             downloadSpeechModel(silentConfirm: ModelSelectionStore.hasCompletedModelOnboarding)
         }
 
         NSLog(
-            "FastFlow ready — engine=\(session.engineName). Hold Right Option. Framework: fuse BYO or use FREE local."
+            "FastFlow ready — hotkey=\(setup.hotkey.name) blob=\(setup.corner.rawValue) engine=\(session.engineName)"
         )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         hotkey?.stop()
+        blob?.hide()
         let session = self.session
         let sem = DispatchSemaphore(value: 0)
         Task { @MainActor in
@@ -107,6 +116,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         status.onAddBYO = { [weak self] in
             self?.addBYOModel()
         }
+        status.onChangeHotkey = { [weak self] in
+            self?.changeHotkey()
+        }
+        status.onShowBlob = { [weak self] in
+            BlobPreferences.isVisible = true
+            self?.blob.show()
+        }
+        status.onMoveBlob = { [weak self] in
+            self?.moveBlobCorner()
+        }
+        status.onRerunSetup = { [weak self] in
+            HotkeyPreferences.hasCompletedSetupWizard = false
+            let setup = SetupWizard.runIfNeeded()
+            self?.status.setHotkeyLabel(setup.hotkey.name)
+            do {
+                try self?.hotkey.applyPreset(setup.hotkey)
+            } catch {
+                NSLog("FastFlow hotkey restart failed: \(error.localizedDescription)")
+            }
+            self?.blob.setCorner(setup.corner)
+            BlobPreferences.isVisible = true
+            self?.blob.show()
+            self?.refreshMenu()
+        }
+    }
+
+    private func changeHotkey() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Choose your push-to-talk key"
+        alert.informativeText = "Hold to dictate, release to insert. Default is Spacebar."
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 320, height: 28), pullsDown: false)
+        for preset in HotkeyMonitor.Preset.all {
+            popup.addItem(withTitle: preset.name)
+            popup.lastItem?.representedObject = preset.id
+            if preset.id == HotkeyPreferences.presetID {
+                popup.select(popup.lastItem)
+            }
+        }
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let id = (popup.selectedItem?.representedObject as? String) ?? HotkeyMonitor.Preset.space.id
+        let preset = HotkeyMonitor.Preset.all.first { $0.id == id } ?? .space
+        do {
+            try hotkey.applyPreset(preset)
+            status.setHotkeyLabel(preset.name)
+            refreshMenu()
+        } catch {
+            NSLog("FastFlow hotkey change failed: \(error.localizedDescription)")
+            PermissionGate.promptAccessibility()
+        }
+    }
+
+    private func moveBlobCorner() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Park the FastFlow blob"
+        alert.informativeText = "Click the blob anytime to cycle corners."
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 28), pullsDown: false)
+        for corner in BlobCorner.allCases {
+            popup.addItem(withTitle: corner.displayName)
+            popup.lastItem?.representedObject = corner.rawValue
+            if corner == BlobPreferences.corner {
+                popup.select(popup.lastItem)
+            }
+        }
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Move")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let raw = (popup.selectedItem?.representedObject as? String) ?? BlobCorner.bottomRight.rawValue
+        let corner = BlobCorner(rawValue: raw) ?? .bottomRight
+        BlobPreferences.isVisible = true
+        blob.setCorner(corner)
+        blob.show()
     }
 
     private func reopenModelPicker() {
@@ -252,7 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if AppConfig.parakeetModelsCached {
                 let done = NSAlert()
                 done.messageText = "FREE local model ready"
-                done.informativeText = "Parakeet is cached. Hold Right Option — private & offline."
+                done.informativeText = "Parakeet is cached. Hold \(HotkeyPreferences.currentPreset.name) — private & offline."
                 done.runModal()
             }
         }

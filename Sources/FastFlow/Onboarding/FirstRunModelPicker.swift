@@ -25,7 +25,7 @@ enum FirstRunModelPicker {
         • FREE — on-device models (private, low memory, no API key)
         • BYO / Cloud — fuse your own model or API for higher accuracy
 
-        Hold Right Option anytime to dictate after you choose.
+        Hold your push-to-talk key anytime to dictate after you choose (you’ll set it next — default Spacebar).
         """
 
         // Accessory: radio-style popup
