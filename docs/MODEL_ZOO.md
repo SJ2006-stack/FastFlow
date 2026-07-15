@@ -1,54 +1,45 @@
 # Model Zoo
 
-Built-in plug-ins registered by `PluginBootstrap.registerBuiltins()`.
+FastFlow is **local-first**. Out of the box you get free on-device models. Cloud engines are **optional plugins** for better or more customized inference (Hugging Face, OpenRouter, Gemini, …).
 
-Dictation is started with the **Right Option** hotkey (push-to-talk). Wake-word engines are not part of FastFlow.
+Dictation always starts with the **Right Option** hotkey.
 
-## ASR
+## Default: local free
 
-| ID | Name | Network | Streaming | Status |
-|---|---|---|---|---|
-| `asr.stub` | Stub ASR | no | no | **Real** — paste-path testing |
-| `asr.parakeet.tdt.v3` | Parakeet TDT v3 | first-run download | no | **Real** via FluidAudio |
-| `asr.moonshine` | Moonshine Tiny | no | no | Stub |
-| `asr.whispercpp` | whisper.cpp | no | no | Stub |
+| ID | Name | Network | Status |
+|---|---|---|---|
+| `asr.stub` | Stub ASR | no | **Real** — path testing |
+| `asr.parakeet.tdt.v3` | Parakeet TDT v3 | first-run download only | **Real** via FluidAudio / CoreML |
+| `asr.moonshine` | Moonshine Tiny | no | Stub (local free fallback) |
 
-## VAD
+Menu → **Download Parakeet (local)…** caches weights once; then ASR is offline and free.
 
-| ID | Name | Status |
-|---|---|---|
-| `vad.energy` | Energy VAD | **Real** (RMS threshold) |
-| `vad.silero` | Silero VAD | Stub (delegates to energy) |
-
-## Screen
+## Local enhanced
 
 | ID | Name | Status |
 |---|---|---|
-| `screen.vlm.quantized` | Quantized VLM | Stub |
+| `asr.whispercpp` | whisper.cpp | Stub — community CoreML/Metal target |
 
-## Bias
+## Cloud plugins (opt-in)
 
-| ID | Name | Status |
-|---|---|---|
-| `bias.memory` | In-Memory Bias List | **Real** |
-| `bias.sqlite` | SQLite Bias List | **Real** (JSON file skeleton under Application Support) |
+Bring your own API key. Audio leaves the device only when you select a cloud engine.
+
+| ID | Provider | Default remote model | Status |
+|---|---|---|---|
+| `asr.cloud.huggingface` | Hugging Face Inference | `openai/whisper-large-v3` | **Real** HTTP |
+| `asr.cloud.openrouter` | OpenRouter | `openai/gpt-4o-audio-preview` | **Real** HTTP |
+| `asr.cloud.gemini` | Google Gemini | `gemini-2.0-flash` | **Real** HTTP |
+
+1. Menu → **Configure Cloud API Keys…**
+2. Pick an engine under **Cloud plugins**
+3. Hold Right Option to dictate
+
+Keys are stored in Keychain (with UserDefaults fallback). See [PROVIDERS.md](PROVIDERS.md).
+
+## VAD / Screen / Bias
+
+Unchanged — see registry manifests (`vad.*`, `screen.*`, `bias.*`).
 
 ## Community drop-ins
 
-Place a folder under `fastflow-plugins/community/<plugin-id>/` with `plugin.json`:
-
-```json
-{
-  "id": "asr.community.example",
-  "name": "Community Example ASR",
-  "kind": "asr",
-  "version": "0.1.0",
-  "summary": "Example community manifest.",
-  "approxActiveMemoryMB": 100,
-  "requiresNetwork": false,
-  "supportsStreaming": false,
-  "isBuiltin": false
-}
-```
-
-Phase 1 registers metadata + a stub factory. See `CONTRIBUTING.md` for the PR checklist.
+`fastflow-plugins/community/<id>/plugin.json` — set `"inferenceTier": "cloudPlugin"` and `"providerFamily": "custom"` for remote community engines. See `CONTRIBUTING.md`.

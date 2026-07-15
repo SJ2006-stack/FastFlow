@@ -2,7 +2,9 @@
 
 Private push-to-talk dictation for macOS. Hold **Right Option**, speak, release — text lands where you’re typing (when focus is verified).
 
-**Hotkey only** — there is no wake word or “Hey FastFlow.” Dictation starts when you press and hold the hotkey.
+**Hotkey only** — there is no wake word. Dictation starts when you press and hold **Right Option**.
+
+**Local free by default** — on-device models (Parakeet / stub). Optional **cloud plugins** (Hugging Face, OpenRouter, Gemini) for better or customized inference when you add an API key.
 
 ## Download for Mac
 
@@ -54,5 +56,6 @@ Default backend is **auto**: tiny stub until models are cached (slim-friendly).
 - [MEMORY.md](docs/MEMORY.md)  
 - [BENCHMARKS.md](docs/BENCHMARKS.md)  
 - [PRIVACY.md](docs/PRIVACY.md)  
-- [MODEL_ZOO.md](docs/MODEL_ZOO.md)  
+- [MODEL_ZOO.md](docs/MODEL_ZOO.md) — local free vs cloud plugins  
+- [PROVIDERS.md](docs/PROVIDERS.md) — Hugging Face / OpenRouter / Gemini keys  
 - [CONTRIBUTING.md](CONTRIBUTING.md)  

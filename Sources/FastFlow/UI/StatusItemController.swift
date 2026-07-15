@@ -1,6 +1,7 @@
 import AppKit
 import AudioToolbox
 import Foundation
+import FastFlowPlugins
 
 enum MenuBarIconState: Equatable {
     case idle
@@ -20,6 +21,8 @@ final class StatusItemController: NSObject {
     var onUseParakeet: (() -> Void)?
     var onDownloadModel: (() -> Void)?
     var onShowPlugins: (() -> Void)?
+    var onSelectEngine: ((String) -> Void)?
+    var onConfigureAPIKeys: (() -> Void)?
 
     private(set) var state: MenuBarIconState = .idle {
         didSet { render() }
@@ -45,33 +48,73 @@ final class StatusItemController: NSObject {
     func rebuildMenu(
         engineName: String = "—",
         pluginCount: Int = 0,
-        modelsCached: Bool = false
+        modelsCached: Bool = false,
+        localEngines: [PluginManifest] = [],
+        cloudEngines: [PluginManifest] = [],
+        selectedID: String? = nil
     ) {
         menu.removeAllItems()
-        menu.addItem(withTitle: "FastFlow (slim)", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "FastFlow", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Dictate: hold Right Option", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Engine: \(engineName)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         let modelStatus = modelsCached
-            ? "Speech model: ready (on disk)"
-            : "Speech model: not downloaded (tiny stub)"
+            ? "Local model: ready (on disk)"
+            : "Local model: stub (download Parakeet for free offline ASR)"
         menu.addItem(withTitle: modelStatus, action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
-        menu.addItem(withTitle: "Plugins: \(pluginCount)", action: nil, keyEquivalent: "")
-        menu.items.last?.isEnabled = false
         menu.addItem(.separator())
+
+        // Local free / enhanced
+        let localHeader = NSMenuItem(title: "Local (free, default)", action: nil, keyEquivalent: "")
+        localHeader.isEnabled = false
+        menu.addItem(localHeader)
         if !modelsCached {
             menu.addItem(
-                withTitle: "Download Speech Model… (~500–600 MB once)",
+                withTitle: "Download Parakeet (local)…",
                 action: #selector(downloadModel),
                 keyEquivalent: "d"
             )
         }
+        for m in localEngines {
+            let mark = (m.id == selectedID) ? "✓ " : "    "
+            let item = NSMenuItem(
+                title: "\(mark)\(m.name)",
+                action: #selector(selectEngine(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = m.id
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+        let cloudHeader = NSMenuItem(
+            title: "Cloud plugins (better / custom)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        cloudHeader.isEnabled = false
+        menu.addItem(cloudHeader)
+        for m in cloudEngines {
+            let mark = (m.id == selectedID) ? "✓ " : "    "
+            let item = NSMenuItem(
+                title: "\(mark)\(m.name)",
+                action: #selector(selectEngine(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = m.id
+            menu.addItem(item)
+        }
+        menu.addItem(
+            withTitle: "Configure Cloud API Keys…",
+            action: #selector(configureKeys),
+            keyEquivalent: ""
+        )
+
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Warm Up Model", action: #selector(warmUp), keyEquivalent: "w")
-        menu.addItem(withTitle: "Use Stub ASR", action: #selector(useStub), keyEquivalent: "")
-        menu.addItem(withTitle: "Use Parakeet TDT v3", action: #selector(useParakeet), keyEquivalent: "")
         menu.addItem(withTitle: "List Model Zoo…", action: #selector(showPlugins), keyEquivalent: "")
         menu.addItem(.separator())
         let perms = NSMenuItem(title: "Permissions: \(PermissionGate.statusSummary())", action: nil, keyEquivalent: "")
@@ -85,6 +128,7 @@ final class StatusItemController: NSObject {
             item.target = self
         }
         statusItem.menu = menu
+        _ = pluginCount
     }
 
     private func render() {
@@ -125,6 +169,11 @@ final class StatusItemController: NSObject {
     @objc private func useParakeet() { onUseParakeet?() }
     @objc private func downloadModel() { onDownloadModel?() }
     @objc private func showPlugins() { onShowPlugins?() }
+    @objc private func configureKeys() { onConfigureAPIKeys?() }
+    @objc private func selectEngine(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onSelectEngine?(id)
+    }
     @objc private func reqMic() {
         Task { _ = await PermissionGate.requestMicrophone() }
     }
@@ -133,10 +182,10 @@ final class StatusItemController: NSObject {
 
 enum ChimePlayer {
     static func playStart() {
-        AudioServicesPlaySystemSound(1113) // quiet begin
+        AudioServicesPlaySystemSound(1113)
     }
 
     static func playStop() {
-        AudioServicesPlaySystemSound(1114) // quiet end
+        AudioServicesPlaySystemSound(1114)
     }
 }

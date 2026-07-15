@@ -130,6 +130,25 @@ public enum PluginKind: String, Sendable, Codable, CaseIterable {
     case biasList
 }
 
+/// Where inference runs. Default product promise = local free.
+public enum InferenceTier: String, Sendable, Codable, CaseIterable {
+    /// Offline / on-device, no API key — FastFlow default.
+    case localFree
+    /// Larger local model (still on-device).
+    case localEnhanced
+    /// Remote API plug-in (Hugging Face, OpenRouter, Gemini, …) — opt-in.
+    case cloudPlugin
+}
+
+/// Catalog family for Model Zoo grouping / credential lookup.
+public enum ModelProviderFamily: String, Sendable, Codable, CaseIterable {
+    case local
+    case huggingface
+    case openrouter
+    case gemini
+    case custom
+}
+
 public struct PluginManifest: Sendable, Hashable, Codable, Identifiable {
     public var id: String
     public var name: String
@@ -140,6 +159,11 @@ public struct PluginManifest: Sendable, Hashable, Codable, Identifiable {
     public var requiresNetwork: Bool
     public var supportsStreaming: Bool
     public var isBuiltin: Bool
+    /// Default = localFree. Cloud plugins must set `.cloudPlugin`.
+    public var inferenceTier: InferenceTier
+    public var providerFamily: ModelProviderFamily
+    /// Optional remote model id (HF repo, OpenRouter slug, Gemini model name).
+    public var remoteModelID: String?
 
     public init(
         id: String,
@@ -150,7 +174,10 @@ public struct PluginManifest: Sendable, Hashable, Codable, Identifiable {
         approxActiveMemoryMB: Int,
         requiresNetwork: Bool = false,
         supportsStreaming: Bool = false,
-        isBuiltin: Bool = true
+        isBuiltin: Bool = true,
+        inferenceTier: InferenceTier = .localFree,
+        providerFamily: ModelProviderFamily = .local,
+        remoteModelID: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -161,5 +188,37 @@ public struct PluginManifest: Sendable, Hashable, Codable, Identifiable {
         self.requiresNetwork = requiresNetwork
         self.supportsStreaming = supportsStreaming
         self.isBuiltin = isBuiltin
+        self.inferenceTier = inferenceTier
+        self.providerFamily = providerFamily
+        self.remoteModelID = remoteModelID
+    }
+
+    public var isCloudPlugin: Bool { inferenceTier == .cloudPlugin }
+    public var isLocalDefaultCandidate: Bool {
+        inferenceTier == .localFree || inferenceTier == .localEnhanced
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, kind, version, summary, approxActiveMemoryMB
+        case requiresNetwork, supportsStreaming, isBuiltin
+        case inferenceTier, providerFamily, remoteModelID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        kind = try c.decode(PluginKind.self, forKey: .kind)
+        version = try c.decodeIfPresent(String.self, forKey: .version) ?? "0.1.0"
+        summary = try c.decode(String.self, forKey: .summary)
+        approxActiveMemoryMB = try c.decode(Int.self, forKey: .approxActiveMemoryMB)
+        requiresNetwork = try c.decodeIfPresent(Bool.self, forKey: .requiresNetwork) ?? false
+        supportsStreaming = try c.decodeIfPresent(Bool.self, forKey: .supportsStreaming) ?? false
+        isBuiltin = try c.decodeIfPresent(Bool.self, forKey: .isBuiltin) ?? false
+        inferenceTier = try c.decodeIfPresent(InferenceTier.self, forKey: .inferenceTier)
+            ?? (requiresNetwork ? .cloudPlugin : .localFree)
+        providerFamily = try c.decodeIfPresent(ModelProviderFamily.self, forKey: .providerFamily)
+            ?? (requiresNetwork ? .custom : .local)
+        remoteModelID = try c.decodeIfPresent(String.self, forKey: .remoteModelID)
     }
 }

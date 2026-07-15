@@ -16,10 +16,13 @@ public final class ParakeetTDTEngine: ASREngine, @unchecked Sendable {
         name: "Parakeet TDT v3",
         kind: .asr,
         version: "0.6.0",
-        summary: "FluidAudio Parakeet TDT 0.6B v3 (CoreML, multilingual). First activate downloads ~500–600 MB.",
+        summary: "Local free — Parakeet TDT on CoreML/ANE. First activate may download weights once.",
         approxActiveMemoryMB: 350,
         requiresNetwork: true, // first-run download only; offline after cache
-        supportsStreaming: false
+        supportsStreaming: false,
+        inferenceTier: .localFree,
+        providerFamily: .local,
+        remoteModelID: nil
     )
 
     private struct State {
@@ -105,7 +108,9 @@ public final class ParakeetTDTEngine: ASREngine, @unchecked Sendable {
         kind: .asr,
         summary: "Disabled — rebuild with FluidAudio (default) to enable.",
         approxActiveMemoryMB: 350,
-        requiresNetwork: true
+        requiresNetwork: true,
+        inferenceTier: .localFree,
+        providerFamily: .local
     )
     public private(set) var isActive = false
 

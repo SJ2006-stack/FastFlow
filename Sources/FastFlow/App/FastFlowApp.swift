@@ -8,7 +8,7 @@ enum FastFlowMain {
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
-        app.setActivationPolicy(.accessory) // LSUIElement-style menu bar app
+        app.setActivationPolicy(.accessory)
         app.run()
     }
 }
@@ -23,7 +23,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         PluginBootstrap.registerBuiltins()
 
-        // Slim default: stub until models cached — keeps first launch / download tiny.
         let engine = AppConfig.makeASREngine(preference: preference)
         session = DictationSession(engine: engine)
         status = StatusItemController()
@@ -49,13 +48,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             status.setState(.error)
         }
 
-        // Never auto-download models on launch (smooth slim install).
-        if preference == .stub || !AppConfig.parakeetModelsCached {
-            Task { await session.warmUp() }
-        }
+        // Local free default — warm stub/Parakeet path without cloud.
+        Task { await session.warmUp() }
 
         NSLog(
-            "FastFlow ready — slim=\(!AppConfig.parakeetModelsCached) engine=\(session.engineName). Hold Right Option to dictate."
+            "FastFlow ready — local-first engine=\(session.engineName). Hold Right Option. Cloud plugins optional."
         )
     }
 
@@ -76,22 +73,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await self?.session.warmUp() }
         }
         status.onUseStub = { [weak self] in
-            guard let self else { return }
-            self.preference = .stub
-            Task {
-                await self.session.replaceEngine(AppConfig.makeASREngine(preference: .stub))
-                await self.session.warmUp()
-                self.refreshMenu()
-            }
+            self?.switchTo(preference: .stub, id: StubASREngine.manifestID)
         }
         status.onUseParakeet = { [weak self] in
-            guard let self else { return }
-            self.preference = .parakeet
-            Task {
-                await self.session.replaceEngine(AppConfig.makeASREngine(preference: .parakeet))
-                await self.session.warmUp()
-                self.refreshMenu()
-            }
+            self?.switchTo(preference: .parakeet, id: ParakeetTDTEngine.manifestID)
         }
         status.onDownloadModel = { [weak self] in
             self?.downloadSpeechModel()
@@ -99,24 +84,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         status.onShowPlugins = { [weak self] in
             self?.showModelZooAlert()
         }
+        status.onSelectEngine = { [weak self] id in
+            self?.switchToEngineID(id)
+        }
+        status.onConfigureAPIKeys = { [weak self] in
+            self?.configureAPIKeys()
+        }
     }
 
-    /// One-time Parakeet download after slim install — user-initiated only.
+    private func switchTo(preference: ASRBackendPreference, id: String) {
+        self.preference = preference
+        ModelSelectionStore.selectedASRID = id
+        Task {
+            status.setState(.loading)
+            await session.replaceEngine(AppConfig.makeASREngine(preference: preference))
+            await session.warmUp()
+            refreshMenu()
+        }
+    }
+
+    private func switchToEngineID(_ id: String) {
+        ModelSelectionStore.selectedASRID = id
+        preference = .auto
+        Task {
+            status.setState(.loading)
+            // Cloud engines need in-process network until NetworkPluginHost ships.
+            let isCloud = AppConfig.cloudASRManifests().contains(where: { $0.id == id })
+            if isCloud {
+                PluginCapabilityEnforcer.beginUserInitiatedModelDownload()
+            }
+            defer {
+                if isCloud { PluginCapabilityEnforcer.endUserInitiatedModelDownload() }
+            }
+            await session.replaceEngine(AppConfig.selectEngine(id: id))
+            await session.warmUp()
+            refreshMenu()
+        }
+    }
+
     private func downloadSpeechModel() {
         let alert = NSAlert()
-        alert.messageText = "Download speech model?"
+        alert.messageText = "Download free local speech model?"
         alert.informativeText = """
-        FastFlow’s slim package does not include ASR weights (keeps the download small).
+        FastFlow defaults to on-device models (no cloud).
 
-        Parakeet TDT v3 is ~500–600 MB, downloaded once into Application Support, then works offline.
+        Parakeet TDT v3 is ~500–600 MB, downloaded once into Application Support, then works offline for free.
 
-        Continue only on Wi‑Fi / unlimited data.
+        Cloud plugins (Hugging Face / OpenRouter / Gemini) are separate — configure API keys if you want those.
         """
         alert.addButton(withTitle: "Download")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         preference = .parakeet
+        ModelSelectionStore.selectedASRID = ParakeetTDTEngine.manifestID
         Task {
             status.setState(.loading)
             PluginCapabilityEnforcer.beginUserInitiatedModelDownload()
@@ -126,30 +147,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             refreshMenu()
             if AppConfig.parakeetModelsCached {
                 let done = NSAlert()
-                done.messageText = "Speech model ready"
-                done.informativeText = "Parakeet is cached. Hold Right Option to dictate — works offline."
+                done.messageText = "Local model ready"
+                done.informativeText = "Parakeet is cached. Hold Right Option — works offline, no API key."
                 done.runModal()
             }
         }
     }
 
+    private func configureAPIKeys() {
+        let families: [(ModelProviderFamily, String)] = [
+            (.huggingface, "Hugging Face token"),
+            (.openrouter, "OpenRouter API key"),
+            (.gemini, "Google Gemini API key"),
+        ]
+        for (family, label) in families {
+            let alert = NSAlert()
+            alert.messageText = label
+            alert.informativeText = """
+            Paste your key for \(family.rawValue) cloud ASR plugins.
+            Leave empty to clear. Keys stay on this Mac (Keychain).
+            Local models never need a key.
+            """
+            let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+            field.stringValue = ModelSelectionStore.apiKey(for: family) ?? ""
+            alert.accessoryView = field
+            alert.addButton(withTitle: "Save")
+            alert.addButton(withTitle: "Skip")
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                ModelSelectionStore.setAPIKey(field.stringValue, for: family)
+            }
+        }
+        let done = NSAlert()
+        done.messageText = "Cloud keys updated"
+        done.informativeText = "Pick a cloud engine under “Cloud plugins” in the menu when you want remote inference."
+        done.runModal()
+        refreshMenu()
+    }
+
     private func refreshMenu() {
-        let count = PluginRegistry.shared.allManifests().count
+        let selected = ModelSelectionStore.selectedASRID ?? session.engineID
         status.rebuildMenu(
             engineName: session.engineName,
-            pluginCount: count,
-            modelsCached: AppConfig.parakeetModelsCached
+            pluginCount: PluginRegistry.shared.allManifests().count,
+            modelsCached: AppConfig.parakeetModelsCached,
+            localEngines: AppConfig.localASRManifests(),
+            cloudEngines: AppConfig.cloudASRManifests(),
+            selectedID: selected
         )
     }
 
     private func showModelZooAlert() {
-        let manifests = PluginRegistry.shared.allManifests()
-        let lines = manifests.map { m in
-            "• [\(m.kind.rawValue)] \(m.name) — ~\(m.approxActiveMemoryMB) MB\(m.requiresNetwork ? " (network)" : "")"
-        }.joined(separator: "\n")
+        let local = AppConfig.localASRManifests().map {
+            "• [local/\($0.inferenceTier.rawValue)] \($0.name)"
+        }
+        let cloud = AppConfig.cloudASRManifests().map {
+            let keyed = ModelSelectionStore.hasAPIKey(for: $0.providerFamily) ? "key✓" : "key✗"
+            return "• [cloud/\($0.providerFamily.rawValue)] \($0.name) (\(keyed))"
+        }
+        let body = (["Local free / enhanced:"] + local + [""] + ["Cloud plugins:"] + cloud)
+            .joined(separator: "\n")
         let alert = NSAlert()
         alert.messageText = "FastFlow Model Zoo"
-        alert.informativeText = lines.isEmpty ? "No plugins registered." : lines
+        alert.informativeText = body
         alert.runModal()
     }
 }

@@ -7,10 +7,12 @@ public final class StubASREngine: ASREngine, @unchecked Sendable {
         id: manifestID,
         name: "Stub ASR",
         kind: .asr,
-        summary: "Echo stub — returns a timed placeholder for paste-path testing.",
+        summary: "Local free — echo stub for paste-path testing (no ML).",
         approxActiveMemoryMB: 5,
         requiresNetwork: false,
-        supportsStreaming: false
+        supportsStreaming: false,
+        inferenceTier: .localFree,
+        providerFamily: .local
     )
     public private(set) var isActive = false
     private var bias: [BiasedWord] = []
@@ -46,10 +48,12 @@ public final class MoonshineEngine: ASREngine, @unchecked Sendable {
         id: manifestID,
         name: "Moonshine Tiny",
         kind: .asr,
-        summary: "Stub — smaller RSS fallback if Parakeet exceeds active RAM budget.",
+        summary: "Local free — smaller on-device ASR (fallback if Parakeet is heavy).",
         approxActiveMemoryMB: 120,
         requiresNetwork: false,
-        supportsStreaming: false
+        supportsStreaming: false,
+        inferenceTier: .localFree,
+        providerFamily: .local
     )
     public private(set) var isActive = false
 
@@ -73,10 +77,12 @@ public final class WhisperCppEngine: ASREngine, @unchecked Sendable {
         id: manifestID,
         name: "whisper.cpp",
         kind: .asr,
-        summary: "Stub — whisper.cpp CoreML/Metal backend (community plug-in target).",
+        summary: "Local enhanced — whisper.cpp CoreML/Metal (community plug-in target).",
         approxActiveMemoryMB: 300,
         requiresNetwork: false,
-        supportsStreaming: false
+        supportsStreaming: false,
+        inferenceTier: .localEnhanced,
+        providerFamily: .local
     )
     public private(set) var isActive = false
 

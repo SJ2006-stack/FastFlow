@@ -4,21 +4,27 @@ import FastFlowPlugins
 enum ASRBackendPreference: String {
     case stub
     case parakeet
-    /// Slim default: stub until Parakeet is cached on disk, then Parakeet.
+    case moonshine
+    case huggingface
+    case openrouter
+    case gemini
+    /// Local-first: selected plug-in, else Parakeet if cached, else stub.
     case auto
 }
 
-/// Resolves which ASREngine to use. Slim packages default to low-RAM stub
-/// until the user downloads models.
+/// Resolves ASR. **Default = local free.** Cloud engines only when explicitly selected.
 enum AppConfig {
     static let capabilityEnforcer = PluginCapabilityEnforcer()
 
-    /// `FASTFLOW_ASR=stub|parakeet|auto`. Default **auto** for smooth slim installs.
     static var preferredBackend: ASRBackendPreference {
         let env = ProcessInfo.processInfo.environment["FASTFLOW_ASR"]?.lowercased()
         switch env {
         case "stub": return .stub
         case "parakeet": return .parakeet
+        case "moonshine": return .moonshine
+        case "huggingface", "hf": return .huggingface
+        case "openrouter": return .openrouter
+        case "gemini": return .gemini
         case "auto": return .auto
         default:
             return .auto
@@ -35,18 +41,49 @@ enum AppConfig {
 
     static func makeASREngine(preference: ASRBackendPreference = preferredBackend) -> any ASREngine {
         PluginBootstrap.registerBuiltins()
+
+        // Explicit user Model Zoo selection wins (unless env forced stub).
+        if preference == .auto, let id = ModelSelectionStore.selectedASRID {
+            if let engine = try? PluginRegistry.shared.makeASRAuthorized(id: id) {
+                return engine
+            }
+        }
+
         switch preference {
         case .stub:
             return stubEngine()
         case .parakeet:
-            return parakeetOrStub()
+            return engineOrStub(ParakeetTDTEngine.manifestID)
+        case .moonshine:
+            return engineOrStub(MoonshineEngine.manifestID)
+        case .huggingface:
+            return engineOrStub(HuggingFaceASREngine.manifestID)
+        case .openrouter:
+            return engineOrStub(OpenRouterASREngine.manifestID)
+        case .gemini:
+            return engineOrStub(GeminiASREngine.manifestID)
         case .auto:
-            // Slim download path: stay on stub (tiny RAM) until models exist.
+            // Local free default — never auto-pick cloud.
             if parakeetModelsCached {
-                return parakeetOrStub()
+                return engineOrStub(ParakeetTDTEngine.manifestID)
             }
             return stubEngine()
         }
+    }
+
+    static func selectEngine(id: String) -> any ASREngine {
+        ModelSelectionStore.selectedASRID = id
+        return (try? PluginRegistry.shared.makeASRAuthorized(id: id)) ?? stubEngine()
+    }
+
+    static func localASRManifests() -> [PluginManifest] {
+        PluginRegistry.shared.allManifests(kind: .asr)
+            .filter(\.isLocalDefaultCandidate)
+    }
+
+    static func cloudASRManifests() -> [PluginManifest] {
+        PluginRegistry.shared.allManifests(kind: .asr)
+            .filter(\.isCloudPlugin)
     }
 
     private static func stubEngine() -> any ASREngine {
@@ -54,18 +91,12 @@ enum AppConfig {
             ?? StubASREngine()
     }
 
-    private static func parakeetOrStub() -> any ASREngine {
-        #if FASTFLOW_USE_FLUIDAUDIO
+    private static func engineOrStub(_ id: String) -> any ASREngine {
         do {
-            return try PluginRegistry.shared.makeASRAuthorized(id: ParakeetTDTEngine.manifestID)
+            return try PluginRegistry.shared.makeASRAuthorized(id: id)
         } catch {
-            NSLog(
-                "FastFlow: Parakeet blocked (\(error.localizedDescription)); using stub. Menu → Download Speech Model…"
-            )
+            NSLog("FastFlow: engine \(id) unavailable (\(error.localizedDescription)); using local stub.")
             return stubEngine()
         }
-        #else
-        return stubEngine()
-        #endif
     }
 }
