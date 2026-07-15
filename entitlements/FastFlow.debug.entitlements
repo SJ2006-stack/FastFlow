@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Local debug / Phase-1 PTT MVP while XPC NetworkPluginHost is unfinished.
+  NOT for notarized distribution. Hardened Runtime audio-input only; sandbox OFF
+  so global hotkey + Accessibility paste + first-run HF download still work.
+  Set FASTFLOW_ALLOW_INPROCESS_NETWORK=1 when exercising Parakeet download in-process.
+-->
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

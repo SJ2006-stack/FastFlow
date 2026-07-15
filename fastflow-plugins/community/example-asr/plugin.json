@@ -1,0 +1,11 @@
+{
+  "id": "asr.community.example",
+  "name": "Community Example ASR",
+  "kind": "asr",
+  "version": "0.1.0",
+  "summary": "Example community manifest — replace with a real engine implementation.",
+  "approxActiveMemoryMB": 100,
+  "requiresNetwork": false,
+  "supportsStreaming": false,
+  "isBuiltin": false
+}
