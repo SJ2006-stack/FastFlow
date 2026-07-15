@@ -1,27 +1,41 @@
 # FastFlow
 
-Private push-to-talk dictation for macOS (Apple Silicon first). Hold **Right Option**, speak, release — transcript pastes at the cursor. Models are pluggable; Phase 1 ships Parakeet TDT v3 via FluidAudio / CoreML.
+Private push-to-talk dictation for macOS (Apple Silicon first). Hold **Right Option**, speak, release — transcript pastes at the cursor when focus is verified.
+
+## Slim download (recommended)
+
+The GitHub Release zip is **app-only** — no CoreML models — so it downloads quickly and stays small (target **&lt; 30 MB**).
+
+1. Get `FastFlow-slim-macos-arm64.zip` from [Releases](https://github.com/SJ2006-stack/FastFlow/releases)
+2. Open `FastFlow.app` (right-click → Open if Gatekeeper asks)
+3. Grant **Microphone** + **Accessibility**
+4. Optional: menu → **Download Speech Model…** (~500–600 MB once) for Parakeet
+5. Until then, a tiny **stub** engine keeps RAM low so you can still test hotkey / paste
+
+Details: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
 
 ## Requirements
 
 - macOS 14+
 - Apple Silicon recommended
-- Xcode 16+ (full Xcode — CLT-only SPM is broken on some macOS 26 setups)
+- Xcode 16+ to build from source (full Xcode — CLT-only SPM is broken on some macOS 26 setups)
 - Debug MVP: `entitlements/FastFlow.debug.entitlements` (sandbox off) for hotkey/paste
 - Ship path: sandboxed main **without** network (`entitlements/FastFlow.entitlements`)
-- Permissions: **Microphone**, **Accessibility** (and often **Input Monitoring**)
 
-## How to run
+## How to run (from source)
 
 ```bash
-cd /Users/shrianshjaiswal/FastFlow
+cd ~/FastFlow
 
-# Default: resolve FluidAudio + build Parakeet path
+# Default: auto backend (stub until models cached — slim-friendly)
 swift build -c release
 swift run FastFlow
 
-# Stub ASR only (no CoreML download) — good for hotkey/paste validation
-FASTFLOW_USE_FLUIDAUDIO=0 FASTFLOW_ASR=stub swift run FastFlow
+# Force stub only
+FASTFLOW_ASR=stub swift run FastFlow
+
+# Slim zip for distribution
+./scripts/make-slim-release.sh release
 ```
 
 Or open `Package.swift` in Xcode → select the `FastFlow` scheme → Run.
@@ -30,13 +44,11 @@ Menu bar app uses `NSApplication.ActivationPolicy.accessory` (no Dock icon).
 
 ### First-run model download
 
-Parakeet’s first download needs network. Under the ship sandbox that is **denied in the main app**. Until NetworkPluginHost XPC exists, use debug profile + escape:
+Parakeet’s first download needs network. Prefer menu → **Download Speech Model…** (user-initiated).  
+Until NetworkPluginHost XPC exists, that path temporarily allows in-process download.  
+CLI escape: `FASTFLOW_ALLOW_INPROCESS_NETWORK=1 FASTFLOW_ASR=parakeet swift run FastFlow`
 
-```bash
-FASTFLOW_ALLOW_INPROCESS_NETWORK=1 FASTFLOW_ASR=parakeet swift run FastFlow
-```
-
-After models are cached, main-app offline activate is allowed for the trusted Parakeet ID. Offline dictation needs no network entitlement.
+After models are cached, ASR works offline. Models live in Application Support — **never** inside the slim `.app`.
 
 ## Permissions checklist
 
@@ -49,6 +61,7 @@ After models are cached, main-app offline activate is allowed for the trusted Pa
 
 | Piece | Status |
 |---|---|
+| Slim download (no models in zip) | Real |
 | Menu bar + icon states | Real |
 | Hotkey (Right Option) | Real |
 | AVAudioEngine → 16 kHz mono | Real |
@@ -56,18 +69,19 @@ After models are cached, main-app offline activate is allowed for the trusted Pa
 | AX / Slack / clipboard insert + confirm UI | Real |
 | Paste (clipboard + Cmd+V + restore) | Real (fallback strategy) |
 | Plugin protocols + registry | Real |
-| Stub ASR | Real |
-| Parakeet via FluidAudio | Real (when `FASTFLOW_USE_FLUIDAUDIO` ≠ `0`) |
+| Stub ASR (default until model download) | Real |
+| Parakeet via FluidAudio | Real (after Download Speech Model…) |
 | Other engines (Moonshine, Whisper, VLM, wake word) | Stubs |
 | XPC unload | Documented only |
 
 ## Docs
 
+- [DISTRIBUTION.md](docs/DISTRIBUTION.md) — **slim zip / smooth download**  
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — process + plugins + future XPC  
-- [INSERTION.md](docs/INSERTION.md) — **focus verify + never silently guess**  
+- [INSERTION.md](docs/INSERTION.md) — focus verify + never silently guess  
 - [MEMORY.md](docs/MEMORY.md) — RSS budgets + Instruments checklist  
-- [BENCHMARKS.md](docs/BENCHMARKS.md) — **cold-start latency gates** + `FastFlowBench`  
-- [PRIVACY.md](docs/PRIVACY.md) — **OS vs software** privacy boundaries (read before claiming guarantees)  
+- [BENCHMARKS.md](docs/BENCHMARKS.md) — cold-start latency gates + `FastFlowBench`  
+- [PRIVACY.md](docs/PRIVACY.md) — OS vs software privacy boundaries  
 - [MODEL_ZOO.md](docs/MODEL_ZOO.md) — registered engines  
 - [CONTRIBUTING.md](CONTRIBUTING.md) — plugin PR checklist  
 
@@ -80,17 +94,3 @@ After models are cached, main-app offline activate is allowed for the trusted Pa
 | Local debug MVP | `entitlements/FastFlow.debug.entitlements` | Unrestricted (sandbox off) |
 
 `requiresNetwork` on plug-ins is advisory for UI. OS sandbox + `PluginCapabilityEnforcer` are the gates. Details: [PRIVACY.md](docs/PRIVACY.md).
-
-## Cold-start benchmark
-
-```bash
-./scripts/run-cold-start-benchmark.sh stub
-# after Xcode + models:
-./scripts/run-cold-start-benchmark.sh parakeet
-```
-
-See [BENCHMARKS.md](docs/BENCHMARKS.md).
-
-## Sandbox note (MVP)
-
-Phase 1 daily-driver builds may still use the **debug** entitlement profile (non-sandboxed) until NetworkPluginHost XPC lands. Do not notarize that profile as “network-isolated.”
