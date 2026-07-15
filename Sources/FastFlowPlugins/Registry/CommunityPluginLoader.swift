@@ -6,7 +6,6 @@ import Foundation
 /// without shipping dynamic libraries. Full dylib/bundle loading is Phase 2+.
 public enum CommunityPluginLoader {
     public static func communityRoot() -> URL {
-        // Prefer repo-relative path when running from a checkout; else Application Support.
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let checkout = cwd.appendingPathComponent("fastflow-plugins/community", isDirectory: true)
         if FileManager.default.fileExists(atPath: checkout.path) {
@@ -32,7 +31,6 @@ public enum CommunityPluginLoader {
                   var manifest = try? JSONDecoder().decode(PluginManifest.self, from: data)
             else { continue }
             manifest.isBuiltin = false
-            // Register as ASR stub factory if kind matches — contributors replace later.
             switch manifest.kind {
             case .asr:
                 let captured = manifest
@@ -43,11 +41,6 @@ public enum CommunityPluginLoader {
                 let captured = manifest
                 PluginRegistry.shared.registerVAD {
                     CommunityStubVAD(manifest: captured)
-                }
-            case .wakeWord:
-                let captured = manifest
-                PluginRegistry.shared.registerWakeWord {
-                    CommunityStubWake(manifest: captured)
                 }
             case .screenContext:
                 let captured = manifest
@@ -80,15 +73,6 @@ private final class CommunityStubVAD: VoiceActivityDetector, @unchecked Sendable
     func activate() async throws { isActive = true }
     func deactivate() async { isActive = false }
     func isSpeech(_ frame: AudioFrame) async -> Bool { _ = frame; return false }
-}
-
-private final class CommunityStubWake: WakeWordDetector, @unchecked Sendable {
-    let manifest: PluginManifest
-    private(set) var isActive = false
-    init(manifest: PluginManifest) { self.manifest = manifest }
-    func activate() async throws { isActive = true }
-    func deactivate() async { isActive = false }
-    func process(_ frame: AudioFrame) async -> Bool { _ = frame; return false }
 }
 
 private final class CommunityStubScreen: ScreenContextParser, @unchecked Sendable {

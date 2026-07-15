@@ -11,7 +11,6 @@ public final class PluginRegistry: @unchecked Sendable {
     private var manifests: [String: PluginManifest] = [:]
     private var asrFactories: [String: @Sendable () -> any ASREngine] = [:]
     private var vadFactories: [String: @Sendable () -> any VoiceActivityDetector] = [:]
-    private var wakeFactories: [String: @Sendable () -> any WakeWordDetector] = [:]
     private var screenFactories: [String: @Sendable () -> any ScreenContextParser] = [:]
     private var biasFactories: [String: @Sendable () -> any BiasListStore] = [:]
 
@@ -31,14 +30,6 @@ public final class PluginRegistry: @unchecked Sendable {
         defer { lock.unlock() }
         manifests[engine.manifest.id] = engine.manifest
         vadFactories[engine.manifest.id] = factory
-    }
-
-    public func registerWakeWord(_ factory: @escaping @Sendable () -> any WakeWordDetector) {
-        let engine = factory()
-        lock.lock()
-        defer { lock.unlock() }
-        manifests[engine.manifest.id] = engine.manifest
-        wakeFactories[engine.manifest.id] = factory
     }
 
     public func registerScreen(_ factory: @escaping @Sendable () -> any ScreenContextParser) {
@@ -101,13 +92,6 @@ public final class PluginRegistry: @unchecked Sendable {
     public func makeVAD(id: String) -> (any VoiceActivityDetector)? {
         lock.lock()
         let factory = vadFactories[id]
-        lock.unlock()
-        return factory?()
-    }
-
-    public func makeWakeWord(id: String) -> (any WakeWordDetector)? {
-        lock.lock()
-        let factory = wakeFactories[id]
         lock.unlock()
         return factory?()
     }

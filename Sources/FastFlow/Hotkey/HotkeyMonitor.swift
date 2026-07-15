@@ -27,7 +27,7 @@ final class HotkeyMonitor: @unchecked Sendable {
     var onDown: (() -> Void)?
     var onUp: (() -> Void)?
 
-    init(choice: Choice = .rightOption) {
+    init(choice: Choice = HotkeyMonitor.rightOption) {
         self.choice = choice
     }
 

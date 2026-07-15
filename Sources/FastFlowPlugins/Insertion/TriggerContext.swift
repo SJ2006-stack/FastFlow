@@ -1,11 +1,9 @@
 import Foundation
 
-/// How dictation was started. Affects insertion confidence.
+/// How dictation was started. FastFlow is hotkey-only (push-to-talk).
 public enum TriggerSource: String, Sendable, Equatable, Codable {
-    /// Hands at keyboard — high focus confidence.
+    /// Hold Right Option (or configured hotkey) — the only supported trigger.
     case hotkey
-    /// Hands-free — lower focus confidence; target may be stale.
-    case wakeWord
 }
 
 /// Focus identity captured at a point in time (trigger or insert).
@@ -59,14 +57,14 @@ public struct FocusSnapshot: Sendable, Equatable, Codable {
     }
 }
 
-/// Session context carried from trigger → transcription → insertion.
+/// Session context carried from hotkey → transcription → insertion.
 public struct DictationSessionContext: Sendable {
     public let trigger: TriggerSource
     public let triggeredAt: Date
     public let initialFocusSnapshot: FocusSnapshot?
 
     public init(
-        trigger: TriggerSource,
+        trigger: TriggerSource = .hotkey,
         triggeredAt: Date = .now,
         initialFocusSnapshot: FocusSnapshot?
     ) {

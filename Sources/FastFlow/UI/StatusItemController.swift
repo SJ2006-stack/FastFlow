@@ -50,6 +50,8 @@ final class StatusItemController: NSObject {
         menu.removeAllItems()
         menu.addItem(withTitle: "FastFlow (slim)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
+        menu.addItem(withTitle: "Dictate: hold Right Option", action: nil, keyEquivalent: "")
+        menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Engine: \(engineName)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         let modelStatus = modelsCached

@@ -53,7 +53,7 @@ Until that exists, marketing or docs must not claim “OS-enforced privacy for s
 
 Accessibility lets FastFlow **read focus** and **synthesize paste**. TCC gates whether that is allowed — not whether the chosen field is the one the user meant.
 
-**Software policy:** `InsertionResolver` + confirmation UI (`docs/INSERTION.md`) refuse auto-insert when focus is ambiguous (especially wake-word). That is not OS enforcement; a buggy strategy could still call paste APIs. Core keeps resolution non-pluggable for that reason.
+**Software policy:** `InsertionResolver` + confirmation UI (`docs/INSERTION.md`) refuse auto-insert when focus is ambiguous. That is not OS enforcement; a buggy strategy could still call paste APIs. Core keeps resolution non-pluggable for that reason.
 
 ## Threat model (short)
 

@@ -2,6 +2,8 @@
 
 Private push-to-talk dictation for macOS. Hold **Right Option**, speak, release — text lands where you’re typing (when focus is verified).
 
+**Hotkey only** — there is no wake word or “Hey FastFlow.” Dictation starts when you press and hold the hotkey.
+
 ## Download for Mac
 
 **[⬇ Download FastFlow.dmg](https://github.com/SJ2006-stack/FastFlow/releases/latest/download/FastFlow.dmg)**

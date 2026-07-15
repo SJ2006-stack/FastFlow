@@ -2,6 +2,9 @@ import Foundation
 
 /// Pure core resolution — not per-strategy.
 /// Load-bearing rule: never silently guess; ambiguity → confirmation UI.
+///
+/// Dictation is **hotkey-only** (push-to-talk). Hands are at the keyboard,
+/// so same-app field changes are treated as verified.
 public enum InsertionVerdict: Sendable, Equatable {
     case verified
     case ambiguous(reason: String)
@@ -11,18 +14,11 @@ public enum InsertionVerdict: Sendable, Equatable {
 public enum InsertionResolver {
     /// Compare initial focus (Option A) to current focus (Option B).
     public static func resolve(
-        trigger: TriggerSource,
+        trigger: TriggerSource = .hotkey,
         initial: FocusSnapshot?,
         current: FocusSnapshot?
     ) -> InsertionVerdict {
-        // Wake word into unknown / non-text target → always ambiguous.
-        if trigger == .wakeWord {
-            if initial == nil || initial?.isTextInput != true {
-                return .ambiguous(
-                    reason: "Wake-word dictation without a known text field at trigger — will not insert blindly."
-                )
-            }
-        }
+        _ = trigger // reserved; only `.hotkey` exists today
 
         guard let current else {
             return .unavailable(reason: "No focused UI element at insertion time.")
@@ -32,18 +28,17 @@ public enum InsertionResolver {
             return .unavailable(reason: "Focused element is not a text-input role.")
         }
 
+        // No snapshot at hotkey press (AX failed) but current is a text field → OK.
         guard let initial else {
-            if trigger == .hotkey {
-                return .verified
-            }
-            return .ambiguous(reason: "No initial focus snapshot; wake-word path requires confirmation.")
+            return .verified
         }
 
         if initial.isSameElement(as: current), current.isTextInput {
             return .verified
         }
 
-        if initial.isSameApp(as: current), current.isTextInput, trigger == .hotkey {
+        // Same app, different field — user is engaged via hotkey.
+        if initial.isSameApp(as: current), current.isTextInput {
             return .verified
         }
 
@@ -53,8 +48,6 @@ public enum InsertionResolver {
             )
         }
 
-        return .ambiguous(
-            reason: "Focus moved within the app during wake-word dictation."
-        )
+        return .ambiguous(reason: "Could not verify a stable text-input target.")
     }
 }

@@ -1,12 +1,6 @@
 import Foundation
 
-/// Always-on or push-to-talk wake / hotword front-end.
-public protocol WakeWordDetector: FastFlowPlugin {
-    /// Feed a frame; returns true when the wake phrase is detected.
-    func process(_ frame: AudioFrame) async -> Bool
-}
-
-/// Voice-activity gate used before ASR (optional in Phase 1 PTT path).
+/// Voice-activity gate used before ASR (optional; dictation starts via hotkey).
 public protocol VoiceActivityDetector: FastFlowPlugin {
     func isSpeech(_ frame: AudioFrame) async -> Bool
 }

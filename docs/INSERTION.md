@@ -2,29 +2,25 @@
 
 FastFlow inserts transcripts only when focus is **verified**. Ambiguity always surfaces a confirmation panel — never a silent best-effort paste into whatever is focused.
 
-## Trigger context
+## Trigger: hotkey only
 
-| Trigger | Confidence | Why |
-|---|---|---|
-| Hotkey | High | Hands were at the keyboard; user is engaged with the focused app |
-| Wake word | Low | Hands-free; focus may be stale or non-text |
+Dictation starts **only** by holding the push-to-talk hotkey (default: **Right Option**). There is no wake-word / “Hey FastFlow” path.
 
-`DictationSessionContext` carries `trigger` + `initialFocusSnapshot` (Option A, captured immediately on trigger) through transcription to insertion. The trigger is never discarded.
+`DictationSessionContext` carries `trigger: .hotkey` + `initialFocusSnapshot` (Option A, captured on key-down) through transcription to insertion.
 
 ## Resolution (core — not per-strategy)
 
 Implemented in `InsertionResolver` (`Sources/FastFlowPlugins/Insertion/`):
 
-1. On trigger → capture `FocusSnapshot` (cheap AX query).
+1. On hotkey down → capture `FocusSnapshot` (cheap AX query).
 2. On transcript ready → re-query focus (Option B).
 3. Compare:
 
 | Case | Result |
 |---|---|
 | Same element, same app, valid text role | `.verified` → auto-insert |
-| Different element, **same** app, valid text, **hotkey** | `.verified` |
+| Different element, **same** app, valid text | `.verified` (hotkey engagement) |
 | Different app, or no valid role | `.ambiguous` / `.unavailable` → confirmation UI |
-| **Wake word** + nil/non-text initial focus | always `.ambiguous` |
 
 ## Strategy priority
 

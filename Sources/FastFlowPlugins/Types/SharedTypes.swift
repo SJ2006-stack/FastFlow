@@ -124,7 +124,6 @@ public struct ScreenContext: Sendable, Equatable {
 // MARK: - Plugin metadata
 
 public enum PluginKind: String, Sendable, Codable, CaseIterable {
-    case wakeWord
     case vad
     case asr
     case screenContext

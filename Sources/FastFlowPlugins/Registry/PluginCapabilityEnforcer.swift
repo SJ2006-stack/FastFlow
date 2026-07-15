@@ -100,7 +100,7 @@ public struct PluginCapabilityEnforcer: Sendable {
         var caps: Set<PluginCapability> = []
         if manifest.requiresNetwork { caps.insert(.outboundNetwork) }
         if manifest.kind == .screenContext { caps.insert(.screenCapture) }
-        if manifest.kind == .asr || manifest.kind == .vad || manifest.kind == .wakeWord {
+        if manifest.kind == .asr || manifest.kind == .vad {
             caps.insert(.microphone)
         }
         return caps

@@ -22,8 +22,6 @@ Every `PluginManifest.approxActiveMemoryMB` is an **estimate** for Settings / Mo
 | `asr.whispercpp` | 300 | stub | | |
 | `vad.energy` | 1 | _TBD_ | | |
 | `vad.silero` | 25 | stub | | |
-| `wake.openwakeword` | 15 | stub | | |
-| `wake.porcupine` | 20 | stub | | |
 | `screen.vlm.quantized` | 200 | stub | | |
 | `bias.memory` / `bias.sqlite` | 1–2 | _TBD_ | | |
 

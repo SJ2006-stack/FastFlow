@@ -4,13 +4,13 @@ import Foundation
 import FastFlowPlugins
 
 /// Slack Electron AX trees are inconsistent — do not trust focused-element AX alone.
-/// Still obeys core resolver: never auto-insert when ambiguous / wake-word unknown.
+/// Still obeys core resolver: never auto-insert when ambiguous.
 @MainActor
 final class SlackInsertionAdapter: TextInsertionStrategy {
     static let slackBundleID = "com.tinyspeck.slackmacgap"
 
     let name = "Slack (clipboard-paste fallback)"
-    let supportedTargets = TargetMatcher.bundleID(Self.slackBundleID)
+    let supportedTargets = TargetMatcher.bundleID("com.tinyspeck.slackmacgap")
 
     func resolveTarget(for session: DictationSessionContext) -> InsertionTarget {
         let current = FocusProbe.captureSnapshot()

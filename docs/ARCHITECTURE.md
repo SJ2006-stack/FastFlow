@@ -3,8 +3,8 @@
 ## Phase 1 — single process
 
 ```
-CGEventTap (Right Option) or wake word (later)
-  → capture FocusSnapshot (Option A) + TriggerSource into DictationSessionContext
+CGEventTap (Right Option) — push-to-talk hotkey only
+  → capture FocusSnapshot (Option A) + TriggerSource.hotkey into DictationSessionContext
   → AudioCapture (AVAudioEngine → 16 kHz mono Float32)
   → ASREngine (ParakeetTDTEngine | StubASREngine | …)
   → InsertionRouter (re-query focus Option B → InsertionResolver)
@@ -15,6 +15,8 @@ CGEventTap (Right Option) or wake word (later)
 Menu bar UI (`StatusItemController`) reflects `idle` / `listening` / `transcribing` / `error` / `loading`.
 
 `DictationSession` owns the utterance buffer, privacy indicator, idle-unload scheduler, and insertion router. Raw PCM is discarded after transcription (**software policy** — see `docs/PRIVACY.md`).
+
+**How to dictate:** hold **Right Option** (no wake word).
 
 Text insertion details: `docs/INSERTION.md`.
 
@@ -48,12 +50,13 @@ A plug-in that lies `requiresNetwork = false` still cannot open sockets in a pro
 
 | Protocol | Role |
 |---|---|
-| `WakeWordDetector` | Optional always-on wake (stubbed in Phase 1; PTT hotkey is core) |
-| `VoiceActivityDetector` | Speech gate (`EnergyVADDetector` real; Silero stub) |
+| `VoiceActivityDetector` | Optional speech gate (`EnergyVADDetector` real; Silero stub) |
 | `ASREngine` | Speech-to-text (`SpeechRecognizer` typealias) |
 | `ScreenContextParser` | Field / UI understanding (stub) |
 | `BiasListStore` | Correction / boost vocabulary |
 | `FastFlowPlugin` | Shared activate/deactivate + manifest |
+
+Dictation trigger is **core hotkey only** — not a plug-in. There is no wake-word protocol.
 
 Shared types: `AudioFrame`, `TranscriptPartial`, `BiasedWord`, `AudioFingerprint`, `CapturedFrame`, `ScreenContext`, `FieldType`, `PluginManifest`, `PluginKind`.
 
@@ -89,7 +92,7 @@ FastFlow.app (menu bar; sandbox, no network)
 
 - **UI process:** hotkey, mic permission UX, paste, icon — never loads CoreML; **no network entitlement**.
 - **Engine XPC:** owns `ASREngine`; prefer **capture in UI, send PCM** over XPC so TCC prompts stay on the main app.
-- **Network host XPC:** first-run HF download, Porcupine, any `requiresNetwork` plug-in.
+- **Network host XPC:** first-run HF download, any `requiresNetwork` plug-in.
 - **Idle unload:** UI invalidates the engine connection after 30–60s; engine unloads models and exits.
 - **Memory gate:** idle RSS of `FastFlow.app` alone must hit **50–80 MB**.
 - **Screen parse (later):** capture+parse in XPC returning **only** `ScreenContext` (no raw frames to main/plugins) — see `docs/PRIVACY.md`.

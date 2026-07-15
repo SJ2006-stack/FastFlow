@@ -14,14 +14,14 @@ final class InsertionRouter {
 
     init(
         strategies: [any TextInsertionStrategy]? = nil,
-        confirmation: InsertionConfirmationPresenter = InsertionConfirmationPresenter()
+        confirmation: InsertionConfirmationPresenter? = nil
     ) {
         self.strategies = strategies ?? [
             SlackInsertionAdapter(),
             AXInsertionStrategy(),
             ClipboardPasteStrategy(),
         ]
-        self.confirmation = confirmation
+        self.confirmation = confirmation ?? InsertionConfirmationPresenter()
     }
 
     /// Resolve + insert, or show confirmation. Never silently guesses.

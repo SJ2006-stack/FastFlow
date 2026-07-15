@@ -1,53 +1,5 @@
 import Foundation
 
-// MARK: - Wake word stubs
-
-public final class OpenWakeWordDetector: WakeWordDetector, @unchecked Sendable {
-    public static let manifestID = "wake.openwakeword"
-    public let manifest = PluginManifest(
-        id: manifestID,
-        name: "OpenWakeWord",
-        kind: .wakeWord,
-        summary: "Stub — open-source wake-word front-end (not loaded in Phase 1 PTT).",
-        approxActiveMemoryMB: 15,
-        requiresNetwork: false
-    )
-    public private(set) var isActive = false
-
-    public init() {}
-
-    public func activate() async throws { isActive = true }
-    public func deactivate() async { isActive = false }
-    public func process(_ frame: AudioFrame) async -> Bool {
-        _ = frame
-        return false
-    }
-}
-
-public final class PorcupineDetector: WakeWordDetector, @unchecked Sendable {
-    public static let manifestID = "wake.porcupine"
-    public let manifest = PluginManifest(
-        id: manifestID,
-        name: "Porcupine",
-        kind: .wakeWord,
-        summary: "Stub — Picovoice Porcupine (requires license + network for model fetch).",
-        approxActiveMemoryMB: 20,
-        requiresNetwork: true
-    )
-    public private(set) var isActive = false
-
-    public init() {}
-
-    public func activate() async throws { isActive = true }
-    public func deactivate() async { isActive = false }
-    public func process(_ frame: AudioFrame) async -> Bool {
-        _ = frame
-        return false
-    }
-}
-
-// MARK: - VAD
-
 /// Simple energy-based VAD used as the default local gate.
 public final class EnergyVADDetector: VoiceActivityDetector, @unchecked Sendable {
     public static let manifestID = "vad.energy"
@@ -81,7 +33,7 @@ public final class SileroVADDetector: VoiceActivityDetector, @unchecked Sendable
         id: manifestID,
         name: "Silero VAD",
         kind: .vad,
-        summary: "Stub — Silero ONNX/CoreML VAD (not wired in Phase 1).",
+        summary: "Stub — Silero ONNX/CoreML VAD (optional gate; PTT hotkey starts dictation).",
         approxActiveMemoryMB: 25,
         requiresNetwork: false
     )

@@ -2,6 +2,8 @@
 
 Built-in plug-ins registered by `PluginBootstrap.registerBuiltins()`.
 
+Dictation is started with the **Right Option** hotkey (push-to-talk). Wake-word engines are not part of FastFlow.
+
 ## ASR
 
 | ID | Name | Network | Streaming | Status |
@@ -17,13 +19,6 @@ Built-in plug-ins registered by `PluginBootstrap.registerBuiltins()`.
 |---|---|---|
 | `vad.energy` | Energy VAD | **Real** (RMS threshold) |
 | `vad.silero` | Silero VAD | Stub (delegates to energy) |
-
-## Wake word
-
-| ID | Name | Status |
-|---|---|---|
-| `wake.openwakeword` | OpenWakeWord | Stub |
-| `wake.porcupine` | Porcupine | Stub (`requiresNetwork`) |
 
 ## Screen
 

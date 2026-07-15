@@ -14,12 +14,11 @@ public enum PluginBootstrap {
 
         let registry = PluginRegistry.shared
 
-        registry.registerWakeWord { OpenWakeWordDetector() }
-        registry.registerWakeWord { PorcupineDetector() }
-
+        // VAD (optional gate — dictation itself is hotkey / push-to-talk only)
         registry.registerVAD { EnergyVADDetector() }
         registry.registerVAD { SileroVADDetector() }
 
+        // ASR
         registry.registerASR { StubASREngine() }
         registry.registerASR { MoonshineEngine() }
         registry.registerASR { WhisperCppEngine() }

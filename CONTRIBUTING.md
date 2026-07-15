@@ -4,7 +4,7 @@
 
 Before opening a PR that adds or changes a model plug-in:
 
-1. **Protocol conformance** — implement the correct protocol (`ASREngine`, `VoiceActivityDetector`, `WakeWordDetector`, `ScreenContextParser`, or `BiasListStore`) plus `FastFlowPlugin`.
+1. **Protocol conformance** — implement the correct protocol (`ASREngine`, `VoiceActivityDetector`, `ScreenContextParser`, or `BiasListStore`) plus `FastFlowPlugin`. Dictation trigger is core hotkey only (not a plug-in).
 2. **Lazy-load** — no model I/O or network in `init()`. Heavy work only in `activate()`.
 3. **Unload** — `deactivate()` must drop references so RSS can fall (verify with Instruments if possible).
 4. **Footprint** — set honest `approxActiveMemoryMB` on the `PluginManifest`; update `docs/MEMORY.md` / `docs/MODEL_ZOO.md`.
