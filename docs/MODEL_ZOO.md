@@ -1,45 +1,28 @@
 # Model Zoo
 
-FastFlow is **local-first**. Out of the box you get free on-device models. Cloud engines are **optional plugins** for better or more customized inference (Hugging Face, OpenRouter, Gemini, …).
+FastFlow is a **dictation interface**. Models plug in.
 
-Dictation always starts with the **Right Option** hotkey.
+On first launch the app asks which model to use. **FREE** = on-device. **BYO** = your API or custom endpoint for higher accuracy.
 
-## Default: local free
-
-| ID | Name | Network | Status |
-|---|---|---|---|
-| `asr.stub` | Stub ASR | no | **Real** — path testing |
-| `asr.parakeet.tdt.v3` | Parakeet TDT v3 | first-run download only | **Real** via FluidAudio / CoreML |
-| `asr.moonshine` | Moonshine Tiny | no | Stub (local free fallback) |
-
-Menu → **Download Parakeet (local)…** caches weights once; then ASR is offline and free.
-
-## Local enhanced
+## FREE — local (default)
 
 | ID | Name | Status |
 |---|---|---|
-| `asr.whispercpp` | whisper.cpp | Stub — community CoreML/Metal target |
+| `asr.parakeet.tdt.v3` | FREE — Parakeet TDT v3 | **Real** CoreML (download once) |
+| `asr.stub` | FREE — Stub | **Real** path testing |
+| `asr.moonshine` | FREE — Moonshine Tiny | Stub slot |
 
-## Cloud plugins (opt-in)
+## BYO — higher accuracy / custom
 
-Bring your own API key. Audio leaves the device only when you select a cloud engine.
+| ID | Name | Status |
+|---|---|---|
+| `asr.cloud.huggingface` | BYO — Hugging Face | **Real** HTTP |
+| `asr.cloud.openrouter` | BYO — OpenRouter | **Real** HTTP |
+| `asr.cloud.gemini` | BYO — Gemini | **Real** HTTP |
+| `asr.byo.*` | BYO — Custom HTTPS | **Real** (user-defined) |
 
-| ID | Provider | Default remote model | Status |
-|---|---|---|---|
-| `asr.cloud.huggingface` | Hugging Face Inference | `openai/whisper-large-v3` | **Real** HTTP |
-| `asr.cloud.openrouter` | OpenRouter | `openai/gpt-4o-audio-preview` | **Real** HTTP |
-| `asr.cloud.gemini` | Google Gemini | `gemini-2.0-flash` | **Real** HTTP |
-
-1. Menu → **Configure Cloud API Keys…**
-2. Pick an engine under **Cloud plugins**
-3. Hold Right Option to dictate
-
-Keys are stored in Keychain (with UserDefaults fallback). See [PROVIDERS.md](PROVIDERS.md).
+Menu → **Add BYO Model…** or **Change Model…**. Developers: [FRAMEWORK.md](FRAMEWORK.md).
 
 ## VAD / Screen / Bias
 
-Unchanged — see registry manifests (`vad.*`, `screen.*`, `bias.*`).
-
-## Community drop-ins
-
-`fastflow-plugins/community/<id>/plugin.json` — set `"inferenceTier": "cloudPlugin"` and `"providerFamily": "custom"` for remote community engines. See `CONTRIBUTING.md`.
+Unchanged — see registry manifests.
