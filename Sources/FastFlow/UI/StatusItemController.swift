@@ -23,6 +23,8 @@ final class StatusItemController: NSObject {
     var onShowPlugins: (() -> Void)?
     var onSelectEngine: ((String) -> Void)?
     var onConfigureAPIKeys: (() -> Void)?
+    var onChangeModel: (() -> Void)?
+    var onAddBYO: (() -> Void)?
 
     private(set) var state: MenuBarIconState = .idle {
         didSet { render() }
@@ -68,20 +70,21 @@ final class StatusItemController: NSObject {
         menu.addItem(.separator())
 
         // Local free / enhanced
-        let localHeader = NSMenuItem(title: "Local (free, default)", action: nil, keyEquivalent: "")
+        let localHeader = NSMenuItem(title: "FREE — local (default)", action: nil, keyEquivalent: "")
         localHeader.isEnabled = false
         menu.addItem(localHeader)
         if !modelsCached {
             menu.addItem(
-                withTitle: "Download Parakeet (local)…",
+                withTitle: "Download FREE Parakeet…",
                 action: #selector(downloadModel),
                 keyEquivalent: "d"
             )
         }
         for m in localEngines {
             let mark = (m.id == selectedID) ? "✓ " : "    "
+            let freeTag = m.inferenceTier == .localFree ? "FREE · " : ""
             let item = NSMenuItem(
-                title: "\(mark)\(m.name)",
+                title: "\(mark)\(freeTag)\(m.name)",
                 action: #selector(selectEngine(_:)),
                 keyEquivalent: ""
             )
@@ -91,7 +94,7 @@ final class StatusItemController: NSObject {
 
         menu.addItem(.separator())
         let cloudHeader = NSMenuItem(
-            title: "Cloud plugins (better / custom)",
+            title: "BYO — your models / APIs",
             action: nil,
             keyEquivalent: ""
         )
@@ -100,7 +103,7 @@ final class StatusItemController: NSObject {
         for m in cloudEngines {
             let mark = (m.id == selectedID) ? "✓ " : "    "
             let item = NSMenuItem(
-                title: "\(mark)\(m.name)",
+                title: "\(mark)BYO · \(m.name)",
                 action: #selector(selectEngine(_:)),
                 keyEquivalent: ""
             )
@@ -108,9 +111,19 @@ final class StatusItemController: NSObject {
             menu.addItem(item)
         }
         menu.addItem(
+            withTitle: "Add BYO Model…",
+            action: #selector(addBYO),
+            keyEquivalent: ""
+        )
+        menu.addItem(
             withTitle: "Configure Cloud API Keys…",
             action: #selector(configureKeys),
             keyEquivalent: ""
+        )
+        menu.addItem(
+            withTitle: "Change Model…",
+            action: #selector(changeModel),
+            keyEquivalent: "m"
         )
 
         menu.addItem(.separator())
@@ -170,6 +183,8 @@ final class StatusItemController: NSObject {
     @objc private func downloadModel() { onDownloadModel?() }
     @objc private func showPlugins() { onShowPlugins?() }
     @objc private func configureKeys() { onConfigureAPIKeys?() }
+    @objc private func changeModel() { onChangeModel?() }
+    @objc private func addBYO() { onAddBYO?() }
     @objc private func selectEngine(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         onSelectEngine?(id)

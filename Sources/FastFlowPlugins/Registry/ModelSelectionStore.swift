@@ -52,9 +52,9 @@ public enum ModelSelectionStore {
         apiKey(for: family) != nil
     }
 
-    // MARK: - Keychain helpers
+    // MARK: - Keychain helpers (module-internal for BYO)
 
-    private static func keychainSet(account: String, value: String) -> Bool {
+    static func keychainSet(account: String, value: String) -> Bool {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -67,7 +67,7 @@ public enum ModelSelectionStore {
         return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
     }
 
-    private static func keychainGet(account: String) -> String? {
+    static func keychainGet(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -81,7 +81,7 @@ public enum ModelSelectionStore {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func keychainDelete(account: String) -> Bool {
+    static func keychainDelete(account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

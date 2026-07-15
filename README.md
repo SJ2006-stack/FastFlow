@@ -4,7 +4,7 @@ Private push-to-talk dictation for macOS. Hold **Right Option**, speak, release 
 
 **Hotkey only** — there is no wake word. Dictation starts when you press and hold **Right Option**.
 
-**Local free by default** — on-device models (Parakeet / stub). Optional **cloud plugins** (Hugging Face, OpenRouter, Gemini) for better or customized inference when you add an API key.
+**Local FREE by default** — first launch asks which model to use (FREE on-device vs BYO). Optional cloud / custom endpoints for higher accuracy. Developers treat FastFlow as a **framework interface** and fuse their own `ASREngine`.
 
 ## Download for Mac
 
@@ -14,13 +14,12 @@ Click → Safari downloads the installer. Then:
 
 1. Open the DMG  
 2. Drag **FastFlow** into **Applications**  
-3. Open it from Applications (right-click → **Open** the first time if macOS asks)  
-4. Grant **Microphone** + **Accessibility**  
-5. Hold **Right Option** to dictate  
+3. Open it (right-click → **Open** the first time if macOS asks)  
+4. **Choose a model** — FREE local (recommended) or BYO  
+5. Grant **Microphone** + **Accessibility**  
+6. Hold **Right Option** to dictate  
 
-Optional later: menu bar → **Download Speech Model…** (~500–600 MB once). The DMG stays small on purpose — no models inside.
-
-More: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) · [Releases](https://github.com/SJ2006-stack/FastFlow/releases)
+More: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) · [docs/FRAMEWORK.md](docs/FRAMEWORK.md) · [Releases](https://github.com/SJ2006-stack/FastFlow/releases)
 
 ---
 
@@ -56,6 +55,7 @@ Default backend is **auto**: tiny stub until models are cached (slim-friendly).
 - [MEMORY.md](docs/MEMORY.md)  
 - [BENCHMARKS.md](docs/BENCHMARKS.md)  
 - [PRIVACY.md](docs/PRIVACY.md)  
-- [MODEL_ZOO.md](docs/MODEL_ZOO.md) — local free vs cloud plugins  
+- [FRAMEWORK.md](docs/FRAMEWORK.md) — fuse your own models (BYO / ASREngine)  
+- [MODEL_ZOO.md](docs/MODEL_ZOO.md) — FREE vs BYO catalog  
 - [PROVIDERS.md](docs/PROVIDERS.md) — Hugging Face / OpenRouter / Gemini keys  
 - [CONTRIBUTING.md](CONTRIBUTING.md)  

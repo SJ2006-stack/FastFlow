@@ -34,6 +34,9 @@ public enum PluginBootstrap {
         registry.registerASR { OpenRouterASREngine() }
         registry.registerASR { GeminiASREngine() }
 
+        // BYO persisted endpoints (developers / power users)
+        BYOPluginRegistrar.registerAllPersisted()
+
         registry.registerScreen { QuantizedVLMParser() }
 
         registry.registerBiasStore { InMemoryBiasListStore() }
