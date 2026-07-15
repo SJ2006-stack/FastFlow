@@ -18,6 +18,7 @@ final class StatusItemController: NSObject {
     var onWarmUp: (() -> Void)?
     var onUseStub: (() -> Void)?
     var onUseParakeet: (() -> Void)?
+    var onDownloadModel: (() -> Void)?
     var onShowPlugins: (() -> Void)?
 
     private(set) var state: MenuBarIconState = .idle {
@@ -41,15 +42,31 @@ final class StatusItemController: NSObject {
         self.state = state
     }
 
-    func rebuildMenu(engineName: String = "—", pluginCount: Int = 0) {
+    func rebuildMenu(
+        engineName: String = "—",
+        pluginCount: Int = 0,
+        modelsCached: Bool = false
+    ) {
         menu.removeAllItems()
-        menu.addItem(withTitle: "FastFlow", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "FastFlow (slim)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Engine: \(engineName)", action: nil, keyEquivalent: "")
+        menu.items.last?.isEnabled = false
+        let modelStatus = modelsCached
+            ? "Speech model: ready (on disk)"
+            : "Speech model: not downloaded (tiny stub)"
+        menu.addItem(withTitle: modelStatus, action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(withTitle: "Plugins: \(pluginCount)", action: nil, keyEquivalent: "")
         menu.items.last?.isEnabled = false
         menu.addItem(.separator())
+        if !modelsCached {
+            menu.addItem(
+                withTitle: "Download Speech Model… (~500–600 MB once)",
+                action: #selector(downloadModel),
+                keyEquivalent: "d"
+            )
+        }
         menu.addItem(withTitle: "Warm Up Model", action: #selector(warmUp), keyEquivalent: "w")
         menu.addItem(withTitle: "Use Stub ASR", action: #selector(useStub), keyEquivalent: "")
         menu.addItem(withTitle: "Use Parakeet TDT v3", action: #selector(useParakeet), keyEquivalent: "")
@@ -104,6 +121,7 @@ final class StatusItemController: NSObject {
     @objc private func warmUp() { onWarmUp?() }
     @objc private func useStub() { onUseStub?() }
     @objc private func useParakeet() { onUseParakeet?() }
+    @objc private func downloadModel() { onDownloadModel?() }
     @objc private func showPlugins() { onShowPlugins?() }
     @objc private func reqMic() {
         Task { _ = await PermissionGate.requestMicrophone() }

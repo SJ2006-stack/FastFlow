@@ -1,9 +1,15 @@
 .DS_Store
 .build/
 .swiftpm/
+dist/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
 DerivedData/
 *.app
 .env
 *.xcuserstate
+# Never commit downloaded ASR weights
+**/HuggingFace/
+**/*.mlmodelc/
+**/*.mlpackage/
+**/FluidAudio/

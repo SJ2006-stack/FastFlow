@@ -67,11 +67,25 @@ public struct PluginCapabilityEnforcer: Sendable {
         self.allowInProcessNetworkEscape = allowInProcessNetworkEscape
     }
 
+    /// UserDefaults key set only while the user runs **Download Speech Model…**
+    public static let allowInProcessDownloadDefaultsKey = "fastflow.allowInProcessModelDownload"
+
     public static func escapeFromEnvironment() -> Bool {
         let v = ProcessInfo.processInfo.environment["FASTFLOW_ALLOW_INPROCESS_NETWORK"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        return v == "1" || v == "true" || v == "yes"
+        if v == "1" || v == "true" || v == "yes" { return true }
+        // Explicit menu action (slim package first-run) — temporary UserDefaults flag.
+        return UserDefaults.standard.bool(forKey: allowInProcessDownloadDefaultsKey)
+    }
+
+    /// Enable a one-shot in-process model download (user-initiated). Caller must clear.
+    public static func beginUserInitiatedModelDownload() {
+        UserDefaults.standard.set(true, forKey: allowInProcessDownloadDefaultsKey)
+    }
+
+    public static func endUserInitiatedModelDownload() {
+        UserDefaults.standard.set(false, forKey: allowInProcessDownloadDefaultsKey)
     }
 
     public static func roleFromEnvironment() -> ProcessSandboxRole {

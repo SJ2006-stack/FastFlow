@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         PluginBootstrap.registerBuiltins()
 
+        // Slim default: stub until models cached — keeps first launch / download tiny.
         let engine = AppConfig.makeASREngine(preference: preference)
         session = DictationSession(engine: engine)
         status = StatusItemController()
@@ -48,13 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             status.setState(.error)
         }
 
-        // Lazy by default — do not download Parakeet until first warm-up or first release.
-        // Still activate stub instantly for path testing.
-        if preference == .stub {
+        // Never auto-download models on launch (smooth slim install).
+        if preference == .stub || !AppConfig.parakeetModelsCached {
             Task { await session.warmUp() }
         }
 
-        NSLog("FastFlow ready — hold Right Option to dictate (engine=\(session.engineName))")
+        NSLog(
+            "FastFlow ready — slim=\(!AppConfig.parakeetModelsCached) engine=\(session.engineName). Hold Right Option to dictate."
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -91,14 +93,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.refreshMenu()
             }
         }
+        status.onDownloadModel = { [weak self] in
+            self?.downloadSpeechModel()
+        }
         status.onShowPlugins = { [weak self] in
             self?.showModelZooAlert()
         }
     }
 
+    /// One-time Parakeet download after slim install — user-initiated only.
+    private func downloadSpeechModel() {
+        let alert = NSAlert()
+        alert.messageText = "Download speech model?"
+        alert.informativeText = """
+        FastFlow’s slim package does not include ASR weights (keeps the download small).
+
+        Parakeet TDT v3 is ~500–600 MB, downloaded once into Application Support, then works offline.
+
+        Continue only on Wi‑Fi / unlimited data.
+        """
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        preference = .parakeet
+        Task {
+            status.setState(.loading)
+            PluginCapabilityEnforcer.beginUserInitiatedModelDownload()
+            defer { PluginCapabilityEnforcer.endUserInitiatedModelDownload() }
+            await session.replaceEngine(AppConfig.makeASREngine(preference: .parakeet))
+            await session.warmUp()
+            refreshMenu()
+            if AppConfig.parakeetModelsCached {
+                let done = NSAlert()
+                done.messageText = "Speech model ready"
+                done.informativeText = "Parakeet is cached. Hold Right Option to dictate — works offline."
+                done.runModal()
+            }
+        }
+    }
+
     private func refreshMenu() {
         let count = PluginRegistry.shared.allManifests().count
-        status.rebuildMenu(engineName: session.engineName, pluginCount: count)
+        status.rebuildMenu(
+            engineName: session.engineName,
+            pluginCount: count,
+            modelsCached: AppConfig.parakeetModelsCached
+        )
     }
 
     private func showModelZooAlert() {
