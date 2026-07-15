@@ -145,8 +145,8 @@ public enum ASRColdStartBenchmark {
             results.append(try await run(
                 engine: parakeet,
                 mode: "cold",
-                modelsCached: enforcer.allowInProcessNetworkEscape,
-                enforcer: enforcer
+                enforcer: enforcer,
+                modelsCached: enforcer.allowInProcessNetworkEscape
             ))
         } catch {
             results.append(ColdStartBenchmarkResult(

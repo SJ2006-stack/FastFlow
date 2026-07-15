@@ -31,7 +31,7 @@ public final class InMemoryBiasListStore: BiasListStore, @unchecked Sendable {
     }
 
     public func remove(word: String) async throws {
-        words.withLock { $0.removeValue(forKey: word.lowercased()) }
+        _ = words.withLock { $0.removeValue(forKey: word.lowercased()) }
     }
 }
 
